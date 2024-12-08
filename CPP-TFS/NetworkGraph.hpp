@@ -9,11 +9,12 @@
 struct Edge {
     std::string source;
     std::string destination;
-    int distance;    
+    int weight;    
     int capacity;  
+    int flow;
 
-    Edge(std::string src, std::string dest, int dt, int cap)
-        : source(src), destination(dest), distance(dt), capacity(cap) {}
+    Edge(std::string src, std::string dest, int wt, int cap)
+        : source(src), destination(dest), weight(wt), capacity(cap), flow(0) {}
 };
 
 // Define the NetworkGraph class
