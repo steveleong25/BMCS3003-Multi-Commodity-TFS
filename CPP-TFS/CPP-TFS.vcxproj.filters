@@ -21,10 +21,10 @@
     <ClCompile Include="NetworkGraph.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="FlowManager.cpp">
+    <ClCompile Include="DjikstrasAlgorithm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DjikstrasAlgorithm.cpp">
+    <ClCompile Include="PropFlowAlgorithm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -32,7 +32,7 @@
     <ClInclude Include="NetworkGraph.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="FlowManager.hpp">
+    <ClInclude Include="DjikstrasAlgorithm.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

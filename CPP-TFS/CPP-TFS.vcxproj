@@ -130,12 +130,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="DjikstrasAlgorithm.cpp" />
-    <ClCompile Include="FlowManager.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="NetworkGraph.cpp" />
+    <ClCompile Include="PropFlowAlgorithm.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="FlowManager.hpp" />
+    <ClInclude Include="DjikstrasAlgorithm.hpp" />
     <ClInclude Include="NetworkGraph.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
