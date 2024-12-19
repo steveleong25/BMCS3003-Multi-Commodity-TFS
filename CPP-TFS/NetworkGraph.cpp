@@ -5,12 +5,14 @@
 Edge::Edge(std::string src, std::string dest, int wt, int cap)
     : source(std::move(src)), destination(std::move(dest)), weight(wt), capacity(cap), flow(0) {}
 
-void NetworkGraph::addEdge(const std::string& src, const std::string& dest, int weight, int capacity, bool isBidirectional) {
+void NetworkGraph::addEdge(const std::string& src, const std::string& dest, int weight, int capacity) {
+    //forward
     edges.emplace_back(src, dest, weight, capacity);
-    if (isBidirectional) {
-        edges.emplace_back(dest, src, weight, capacity);
-    }
+
+    //backward
+    edges.emplace_back(dest, src, weight, capacity);
 }
+
 
 // Retrieve all edges in the graph
 const std::vector<Edge> &NetworkGraph::getEdges() const {

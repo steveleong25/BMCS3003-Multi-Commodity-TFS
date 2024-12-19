@@ -5,23 +5,12 @@
 #include <unordered_map>
 #include <algorithm>
 #include "NetworkGraph.hpp"
-#include "DjikstrasAlgorithm.hpp"
-
+#include "PathFinder.hpp"
 
 using namespace std;
 
 const double INF = numeric_limits<double>::max();
 
-// Max congestion finder
-double findMaxCongestion(NetworkGraph& graph) {
-    double maxCongestion = 0;
-    for (const Edge& e : graph.getEdges()) {
-        if (e.capacity > 0) {
-            maxCongestion = max(maxCongestion, static_cast<double>(e.flow) / e.capacity);
-        }
-    }
-    return maxCongestion;
-}
 
 // Scale down flows
 void scaleDownFlows(NetworkGraph& graph, double scaleFactor) {
@@ -42,38 +31,47 @@ void sendFlow(NetworkGraph& graph, const vector<string>& path, double amount) {
 }
 
 // Equal Distribution Algorithm
-void equalDistributionAlgorithm(NetworkGraph& graph, vector<pair<string, string>> commodities, vector<double> demands) {
-    int maxIterations = 100;
+void equalDistributionAlgorithm(NetworkGraph& graph,
+    std::vector<std::pair<std::string, std::string>> commodities,
+    std::vector<double> demands) {
+    std::vector<double> flowDelivered(commodities.size(), 0.0); // Track flow delivered for each commodity
 
-    for (int iteration = 0; iteration < maxIterations; ++iteration) {
-        for (size_t i = 0; i < commodities.size(); ++i) {
-            const string& source = commodities[i].first;
-            const string& target = commodities[i].second;
+    for (size_t i = 0; i < commodities.size(); ++i) {
+        const std::string& source = commodities[i].first;
+        const std::string& destination = commodities[i].second;
 
-            vector<string> path = findShortestPath(graph.getEdges(), source, target);
+        double remainingDemand = demands[i];
 
-            if (!path.empty()) {
-                double remainingDemand = demands[i];
-                double pathCapacity = INF;
+        // Get all possible paths from source to destination, ranked by weight (shortest to longest)
+        std::vector<std::vector<std::string>> allPaths = findAllPaths(graph.getEdges(), source, destination);
 
-                for (size_t j = 0; j < path.size() - 1; ++j) {
-                    Edge& edge = graph.getEdge(path[j], path[j + 1]);
-                    pathCapacity = min(pathCapacity, static_cast<double>(edge.capacity - edge.flow));
-                }
+        for (const auto& path : allPaths) {
+            if (remainingDemand <= 0) break;
 
-                double flowToSend = min(remainingDemand, pathCapacity);
+            // Calculate bottleneck capacity for the current path
+            double pathCapacity = INF;
+            for (size_t j = 0; j < path.size() - 1; ++j) {
+                Edge& edge = graph.getEdge(path[j], path[j + 1]);
+                pathCapacity = std::min(pathCapacity, static_cast<double>(edge.capacity - edge.flow));
+            }
+
+            if (pathCapacity > 0) {
+                // Assign flow to the path
+                double flowToSend = std::min(remainingDemand, pathCapacity);
                 sendFlow(graph, path, flowToSend);
-                demands[i] -= flowToSend;
+
+                // Update remaining demand and track delivered flow
+                remainingDemand -= flowToSend;
+                flowDelivered[i] += flowToSend;
             }
         }
+    }
 
-        double maxCongestion = findMaxCongestion(graph);
-
-        if (maxCongestion <= 1) {
-            break;
-        }
-
-        scaleDownFlows(graph, maxCongestion);
+    // Display results
+    std::cout << "\nFinal Results: Units Successfully Reaching Destinations\n";
+    for (size_t i = 0; i < commodities.size(); ++i) {
+        std::cout << "Commodity " << i + 1 << " (From " << commodities[i].first
+            << " to " << commodities[i].second << "): "
+            << flowDelivered[i] << " units\n";
     }
 }
-
