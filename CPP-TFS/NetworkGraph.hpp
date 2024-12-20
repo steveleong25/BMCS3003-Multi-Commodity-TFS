@@ -20,13 +20,12 @@ struct Edge {
 
 class NetworkGraph {
 private:
-    std::vector<Edge> edges;  // Edge list
+    std::vector<Edge> edges;
 
 public:
     void addEdge(const std::string &src, const std::string &dest, int weight, int capacity);
-    const std::vector<Edge> &getEdges() const;
+    std::vector<Edge> &getEdges();
     Edge &getEdge(const std::string &src, const std::string &dest);
-    void displayGraph() const;
 };
 
 #endif

@@ -1,9 +1,4 @@
 #include <iostream>
-#include <vector>
-#include <queue>
-#include <limits>
-#include <unordered_map>
-#include <algorithm>
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 
@@ -11,18 +6,6 @@ using namespace std;
 
 const double INF = numeric_limits<double>::max();
 
-
-// Scale down flows
-void scaleDownFlows(NetworkGraph& graph, double scaleFactor) {
-    for (const Edge& e : graph.getEdges()) {  // Read-only access to edges
-        if (e.capacity > 0) {
-            Edge& edge = graph.getEdge(e.source, e.destination);
-            edge.setFlow(static_cast<int>(e.flow / scaleFactor));
-        }
-    }
-}
-
-// Send flow along a path
 void sendFlow(NetworkGraph& graph, const vector<string>& path, double amount) {
     for (size_t i = 0; i < path.size() - 1; ++i) {
         Edge& edge = graph.getEdge(path[i], path[i + 1]);
@@ -30,48 +13,152 @@ void sendFlow(NetworkGraph& graph, const vector<string>& path, double amount) {
     }
 }
 
-// Equal Distribution Algorithm
-void equalDistributionAlgorithm(NetworkGraph& graph,
-    std::vector<std::pair<std::string, std::string>> commodities,
-    std::vector<double> demands) {
-    std::vector<double> flowDelivered(commodities.size(), 0.0); // Track flow delivered for each commodity
+void redistributeFlowForEqualization(NetworkGraph& graph,
+    vector<pair<string, string>>& commodities,
+    vector<double>& demands,
+    vector<double>& unitsDelivered,
+    vector<double>& successRates) {
 
+    double totalUnitsDelivered = 0;
+    double totalDemand = 0;
     for (size_t i = 0; i < commodities.size(); ++i) {
-        const std::string& source = commodities[i].first;
-        const std::string& destination = commodities[i].second;
+        totalUnitsDelivered += unitsDelivered[i];
+        totalDemand += demands[i];
+    }
+    double equalSuccessRate = totalUnitsDelivered / totalDemand;
 
-        double remainingDemand = demands[i];
+    // redistribute flow from overperforming commodities to underperforming ones
+    for (size_t i = 0; i < commodities.size(); ++i) {
+        if (successRates[i] > equalSuccessRate) {
+            double excessFlow = floor((successRates[i] - equalSuccessRate) * demands[i]);
+            const string& source = commodities[i].first;
+            const string& destination = commodities[i].second;
 
-        // Get all possible paths from source to destination, ranked by weight (shortest to longest)
-        std::vector<std::vector<std::string>> allPaths = findAllPaths(graph.getEdges(), source, destination);
+            vector<vector<string>> paths = findAllPaths(graph.getEdges(), source, destination);
+            for (const auto& path : paths) {
+                if (excessFlow <= 0) break;
+                double pathFlow = INF; 
+                for (size_t j = 0; j < path.size() - 1; ++j) {
+                    Edge& edge = graph.getEdge(path[j], path[j + 1]);
+                    pathFlow = min(pathFlow, static_cast<double>(edge.flow));
+                }
 
-        for (const auto& path : allPaths) {
-            if (remainingDemand <= 0) break;
-
-            // Calculate bottleneck capacity for the current path
-            double pathCapacity = INF;
-            for (size_t j = 0; j < path.size() - 1; ++j) {
-                Edge& edge = graph.getEdge(path[j], path[j + 1]);
-                pathCapacity = std::min(pathCapacity, static_cast<double>(edge.capacity - edge.flow));
-            }
-
-            if (pathCapacity > 0) {
-                // Assign flow to the path
-                double flowToSend = std::min(remainingDemand, pathCapacity);
-                sendFlow(graph, path, flowToSend);
-
-                // Update remaining demand and track delivered flow
-                remainingDemand -= flowToSend;
-                flowDelivered[i] += flowToSend;
+                // reduce flow
+                double flowToRemove = min(excessFlow, pathFlow);
+                if (flowToRemove > 0) {
+                    sendFlow(graph, path, -flowToRemove);
+                    unitsDelivered[i] -= flowToRemove;
+                    excessFlow -= flowToRemove;
+                }
             }
         }
     }
 
-    // Display results
-    std::cout << "\nFinal Results: Units Successfully Reaching Destinations\n";
+    // allocate freed-up flow to underperforming commodities
     for (size_t i = 0; i < commodities.size(); ++i) {
-        std::cout << "Commodity " << i + 1 << " (From " << commodities[i].first
-            << " to " << commodities[i].second << "): "
-            << flowDelivered[i] << " units\n";
+        if (successRates[i] < equalSuccessRate) {
+            double neededFlow = ceil((equalSuccessRate - successRates[i]) * demands[i]);
+            const string& source = commodities[i].first;
+            const string& destination = commodities[i].second;
+
+            vector<vector<string>> paths = findAllPaths(graph.getEdges(), source, destination);
+            for (const auto& path : paths) {
+                if (neededFlow <= 0) break;
+
+                // calculate and identify bottleneck
+                double pathCapacity = INF;
+                for (size_t j = 0; j < path.size() - 1; ++j) {
+                    Edge& edge = graph.getEdge(path[j], path[j + 1]);
+                    pathCapacity = min(pathCapacity, static_cast<double>(edge.capacity - edge.flow));
+                }
+
+                // allocate flow
+                double flowToAdd = min(neededFlow, pathCapacity);
+                if (flowToAdd > 0) {
+                    sendFlow(graph, path, flowToAdd);
+                    unitsDelivered[i] += flowToAdd;
+                    neededFlow -= flowToAdd;
+                }
+            }
+        }
     }
+}
+
+void equalDistributionAlgorithm(NetworkGraph& graph,
+    vector<pair<string, string>> commodities,
+    vector<double> demands) {
+    vector<double> unitsDelivered(commodities.size(), 0.0); 
+    vector<double> successRates(commodities.size(), 0.0); 
+
+    bool moreFlowNeeded = true;
+
+    while (moreFlowNeeded) {
+        moreFlowNeeded = false;
+
+        // update success rates
+        for (size_t i = 0; i < commodities.size(); ++i) {
+            if (demands[i] > 0) {
+                successRates[i] = unitsDelivered[i] / demands[i];
+            }
+            else {
+                successRates[i] = 1.0;
+            }
+        }
+
+        // find commodity with the lowest success rate
+        size_t lowestIndex = 0;
+        for (size_t i = 1; i < successRates.size(); ++i) {
+            if (successRates[i] < successRates[lowestIndex]) {
+                lowestIndex = i;
+            }
+        }
+
+        const string& source = commodities[lowestIndex].first;
+        const string& destination = commodities[lowestIndex].second;
+        double remainingDemand = demands[lowestIndex] - unitsDelivered[lowestIndex];
+
+        // get all paths from source to dest
+        vector<vector<string>> allPaths = findAllPaths(graph.getEdges(), source, destination);
+
+        for (const auto& path : allPaths) {
+            if (remainingDemand <= 0) break;
+
+            // calculate bottleneck capacity
+            double pathCapacity = INF;
+            for (size_t j = 0; j < path.size() - 1; ++j) {
+                Edge& edge = graph.getEdge(path[j], path[j + 1]);
+                pathCapacity = min(pathCapacity, static_cast<double>(edge.capacity - edge.flow));
+            }
+
+            if (pathCapacity > 0) {
+                moreFlowNeeded = true;
+
+                // allocate flow
+                double flowToSend = min(remainingDemand, pathCapacity);
+                sendFlow(graph, path, flowToSend);
+
+                // update demand and track delivered flow
+                unitsDelivered[lowestIndex] += flowToSend;
+                remainingDemand -= flowToSend;
+            }
+        }
+    }
+
+    cout << "\nFinal Results: Units Successfully Reaching Destinations (Before Redistribution)\n";
+    for (size_t i = 0; i < commodities.size(); ++i) {
+        cout << "Commodity " << i + 1 << " (From " << commodities[i].first
+            << " to " << commodities[i].second << "): "
+            << unitsDelivered[i] << "/" << demands[i] << " units\n";
+    }
+
+    redistributeFlowForEqualization(graph, commodities, demands, unitsDelivered, successRates);
+
+    cout << "\nFinal Results: Units Successfully Reaching Destinations (After Redistribution)\n";
+    for (size_t i = 0; i < commodities.size(); ++i) {
+        cout << "Commodity " << i + 1 << " (From " << commodities[i].first
+            << " to " << commodities[i].second << "): "
+            << unitsDelivered[i] << "/" << demands[i] << " units\n";
+    }
+
+
 }

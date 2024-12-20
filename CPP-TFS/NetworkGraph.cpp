@@ -1,6 +1,6 @@
 #include "NetworkGraph.hpp"
 #include <iostream>
-#include <stdexcept>
+
 
 Edge::Edge(std::string src, std::string dest, int wt, int cap)
     : source(std::move(src)), destination(std::move(dest)), weight(wt), capacity(cap), flow(0) {}
@@ -14,12 +14,12 @@ void NetworkGraph::addEdge(const std::string& src, const std::string& dest, int 
 }
 
 
-// Retrieve all edges in the graph
-const std::vector<Edge> &NetworkGraph::getEdges() const {
+// get all edges
+std::vector<Edge> &NetworkGraph::getEdges() {
     return edges;
 }
 
-// Retrieve an edge given its source and destination
+// get edge by source and dest
 Edge &NetworkGraph::getEdge(const std::string& src, const std::string& dest) {
     for (auto &edge : edges) {
         if (edge.source == src && edge.destination == dest) {
@@ -29,13 +29,3 @@ Edge &NetworkGraph::getEdge(const std::string& src, const std::string& dest) {
     throw std::runtime_error("Edge not found.");
 }
 
-// Display the graph (for debugging purposes)
-void NetworkGraph::displayGraph() const {
-    std::cout << "Graph Edges:\n";
-    for (const auto& edge : edges) {
-        std::cout << edge.source << " -> " << edge.destination
-            << " | Weight: " << edge.weight
-            << ", Capacity: " << edge.capacity
-            << ", Flow: " << edge.flow << '\n';
-    }
-}
