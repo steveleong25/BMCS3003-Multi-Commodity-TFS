@@ -47,6 +47,22 @@ __global__ void findLowestSuccessRate(double* successRates, int* lowestIndex, in
     }
 }
 
+__global__ void allocateFlow(double* flows, const double* capacities, const int* paths, int pathLength, double remainingDemand, int numEdges) {
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (idx < pathLength - 1) {
+        int src = paths[idx];
+        int dest = paths[idx + 1];
+
+        double bottleneckCapacity = capacities[src * numEdges + dest] - flows[src * numEdges + dest];
+        if (bottleneckCapacity > 0) {
+            double flowToSend = min(remainingDemand, bottleneckCapacity);
+            atomicAdd(&flows[src * numEdges + dest], flowToSend);
+            atomicAdd(&flows[dest * numEdges + src], -flowToSend);
+            remainingDemand -= flowToSend;
+        }
+    }
+}
+
 extern "C" void CUDA_equalDistributionAlgorithm(NetworkGraph & graph,
     std::vector<std::pair<std::string, std::string>> commodities,
     std::vector<double> demands) {
@@ -128,4 +144,11 @@ extern "C" void CUDA_equalDistributionAlgorithm(NetworkGraph & graph,
     cudaFree(d_lowestIndex);
 
     std::cout << "CUDA-based proportional flow algorithm completed.\n";
+    cout << "\nFinal Results: Units Successfully Reaching Destinations (Before Redistribution)\n";
+    for (size_t i = 0; i < commodities.size(); ++i) {
+        cout << "Commodity " << i + 1 << " (From " << commodities[i].first
+            << " to " << commodities[i].second << "): "
+            << unitsDelivered[i] << "/" << demands[i] << " units\n";
+    }
+
 }
