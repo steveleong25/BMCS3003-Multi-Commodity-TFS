@@ -38,5 +38,13 @@
     <ClInclude Include="PropFlowAlgorithm.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="main_cuda.cuh">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="main_cuda.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

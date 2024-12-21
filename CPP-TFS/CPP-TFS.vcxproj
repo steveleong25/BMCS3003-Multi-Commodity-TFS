@@ -54,6 +54,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.6.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -70,6 +71,10 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -138,11 +143,16 @@
     <ClCompile Include="PropFlowAlgorithm.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="main_cuda.cuh" />
     <ClInclude Include="PathFinder.hpp" />
     <ClInclude Include="NetworkGraph.hpp" />
     <ClInclude Include="PropFlowAlgorithm.hpp" />
   </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="main_cuda.cu" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.6.targets" />
   </ImportGroup>
 </Project>

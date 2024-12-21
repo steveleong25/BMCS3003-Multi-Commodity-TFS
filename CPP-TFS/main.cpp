@@ -1,10 +1,13 @@
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "PropFlowAlgorithm.hpp"
+//#include "CUDAFlowAlgorithm.hpp"
 #include <iostream>
 #include <omp.h>
 
 using namespace std;
+extern "C" void CUDA_equalDistributionAlgorithm(NetworkGraph & graph, const std::vector<std::pair<std::string, std::string>>&commodities, const std::vector<double>&demands);
+
 
 int main() {
     NetworkGraph graph;
@@ -34,7 +37,10 @@ int main() {
     vector<double> demands = { 20, 15, 20 };  // demands for each commodity
 
     double omp_start = omp_get_wtime();
+    //equalDistributionAlgorithm(graph, commodities, demands);
     OMP_equalDistributionAlgorithm(graph, commodities, demands);
+    //CUDA_equalDistributionAlgorithm(graph, commodities, demands);
+
     double omp_end = omp_get_wtime();
 
     double omp_rt = omp_end - omp_start;
@@ -46,6 +52,7 @@ int main() {
     }
 
     cout << "\nOMP runtime: " << omp_rt << endl;
+
 
     return 0;
 }
