@@ -362,7 +362,7 @@ void OMP_equalDistributionAlgorithm(NetworkGraph& graph,
         vector<vector<string>> allPaths = findAllPaths(graph.getEdges(), source, destination);
 
         // Allocate flow using available paths in parallel
-#pragma omp parallel
+        #pragma omp parallel
         {
             #pragma omp critical
             {
