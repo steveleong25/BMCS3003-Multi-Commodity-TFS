@@ -3,8 +3,6 @@
 
 #include "NetworkGraph.hpp"
 
-void initializeEdgeLocks(NetworkGraph& graph);
-
 void sendFlow(NetworkGraph& graph, const std::vector<std::string>& path, double amount);
 
 void equalDistributionAlgorithm(NetworkGraph& graph, std::vector<std::pair<std::string, std::string>> commodities, std::vector<double> demands);

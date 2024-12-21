@@ -33,10 +33,17 @@ int main() {
     };
     vector<double> demands = { 20, 15, 20 };  // demands for each commodity
 
+
+
+    double ori_start = omp_get_wtime();
+    equalDistributionAlgorithm(graph, commodities, demands);
+    double ori_end = omp_get_wtime();
+    
     double omp_start = omp_get_wtime();
     OMP_equalDistributionAlgorithm(graph, commodities, demands);
     double omp_end = omp_get_wtime();
 
+	double ori_rt = ori_end - ori_start;
     double omp_rt = omp_end - omp_start;
 
     cout << "\nFinal Flows After Proportional Balancing:\n";
@@ -45,6 +52,7 @@ int main() {
             << " | Flow: " << e.flow << "/" << e.capacity << "\n";
     }
 
+    cout << "\nOriginal runtime: " << ori_rt << endl;
     cout << "\nOMP runtime: " << omp_rt << endl;
 
     return 0;

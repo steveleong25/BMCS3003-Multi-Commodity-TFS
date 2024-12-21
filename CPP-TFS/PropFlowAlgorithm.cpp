@@ -6,7 +6,6 @@
 
 using namespace std;
 
-std::mutex flowMutex;
 
 const double INF = numeric_limits<double>::max();
 
@@ -211,16 +210,19 @@ void OMP_redistributeFlowForEqualization(NetworkGraph& graph,
 
     double totalUnitsDelivered = 0;
     double totalDemand = 0;
+
+    // Calculate total units delivered and total demand
+    #pragma omp parallel for reduction(+:totalUnitsDelivered, totalDemand)
     for (int i = 0; i < commodities.size(); ++i) {
         totalUnitsDelivered += unitsDelivered[i];
         totalDemand += demands[i];
     }
-    double equalSuccessRate = totalUnitsDelivered / totalDemand;
 
+    double equalSuccessRate = totalUnitsDelivered / totalDemand;
     vector<double> unusedFlow(commodities.size(), 0.0);
 
-    // Redistribution of flow in parallel
-#pragma omp parallel for
+    // Redistribution of excess flow
+    #pragma omp parallel for
     for (int i = 0; i < commodities.size(); ++i) {
         if (successRates[i] > equalSuccessRate) {
             double excessFlow = floor((successRates[i] - equalSuccessRate) * demands[i]);
@@ -228,32 +230,37 @@ void OMP_redistributeFlowForEqualization(NetworkGraph& graph,
             const string& destination = commodities[i].second;
 
             vector<vector<string>> paths = findAllPaths(graph.getEdges(), source, destination);
-            for (const auto& path : paths) {
-                if (excessFlow <= 0) break;
-                double pathFlow = INF;
-                for (int j = 0; j < path.size() - 1; ++j) {
-                    Edge& edge = graph.getEdge(path[j], path[j + 1]);
-                    pathFlow = min(pathFlow, static_cast<double>(edge.flow));
-                }
+            #pragma omp parallel
+            {
+                #pragma omp critical
+                {
+                    for (const auto& path : paths) {
+                        if (excessFlow <= 0) break;
 
-                double flowToRemove = min(excessFlow, pathFlow);
-                if (flowToRemove > 0) {
-                    // Lock the edge while modifying the flow
-                    for (int j = 0; j < path.size() - 1; ++j) {
-                        std::lock_guard<std::mutex> guard(flowMutex);  // Critical section for flow modification
-                        Edge& edge = graph.getEdge(path[j], path[j + 1]);
-                        sendFlow(graph, path, -flowToRemove);
+                        double pathFlow = INF;
+
+                        // calculate min flow
+                        for (int j = 0; j < path.size() - 1; ++j) {
+                            Edge& edge = graph.getEdge(path[j], path[j + 1]);
+                            pathFlow = min(pathFlow, static_cast<double>(edge.flow));
+                        }
+
+                        double flowToRemove = min(excessFlow, pathFlow);
+                        if (flowToRemove > 0) {
+                            sendFlow(graph, path, -flowToRemove);
+                            unitsDelivered[i] -= flowToRemove;
+                            excessFlow -= flowToRemove;
+                            unusedFlow[i] += flowToRemove;
+                        }
                     }
-                    unitsDelivered[i] -= flowToRemove;
-                    excessFlow -= flowToRemove;
-                    unusedFlow[i] += flowToRemove;
                 }
             }
+
         }
     }
 
-    // Adjustments for commodities with less flow
-#pragma omp parallel for
+    // redistribution of flow
+    #pragma omp parallel for
     for (int i = 0; i < commodities.size(); ++i) {
         if (successRates[i] < equalSuccessRate) {
             double neededFlow = ceil((equalSuccessRate - successRates[i]) * demands[i]);
@@ -261,58 +268,66 @@ void OMP_redistributeFlowForEqualization(NetworkGraph& graph,
             const string& destination = commodities[i].second;
 
             vector<vector<string>> paths = findAllPaths(graph.getEdges(), source, destination);
-            for (const auto& path : paths) {
-                if (neededFlow <= 0) break;
+            #pragma omp parallel
+            {
+                #pragma omp critical
+                {
+                    for (const auto& path : paths) {
+                        if (neededFlow <= 0) break;
 
-                double pathCapacity = INF;
-                for (int j = 0; j < path.size() - 1; ++j) {
-                    Edge& edge = graph.getEdge(path[j], path[j + 1]);
-                    pathCapacity = min(pathCapacity, static_cast<double>(edge.capacity - edge.flow));
-                }
+                        double pathCapacity = INF;
 
-                double flowToAdd = min(neededFlow, pathCapacity);
-                if (flowToAdd > 0) {
-                    // Lock the edge while modifying the flow
-                    for (int j = 0; j < path.size() - 1; ++j) {
-                        std::lock_guard<std::mutex> guard(flowMutex);  // Critical section for flow modification
-                        Edge& edge = graph.getEdge(path[j], path[j + 1]);
-                        sendFlow(graph, path, flowToAdd);
+                        // calculate available capacity in the path
+                        for (int j = 0; j < path.size() - 1; ++j) {
+                            Edge& edge = graph.getEdge(path[j], path[j + 1]);
+                            pathCapacity = min(pathCapacity, static_cast<double>(edge.capacity - edge.flow));
+                        }
+
+                        double flowToAdd = min(neededFlow, pathCapacity);
+                        if (flowToAdd > 0) {
+                            sendFlow(graph, path, flowToAdd);
+                            unitsDelivered[i] += flowToAdd;
+                            neededFlow -= flowToAdd;
+                            unusedFlow[i] -= flowToAdd;
+                        }
                     }
-                    unitsDelivered[i] += flowToAdd;
-                    neededFlow -= flowToAdd;
-                    unusedFlow[i] -= flowToAdd;
                 }
             }
         }
     }
-
-    // Post-redistribution adjustment for unused flow
-#pragma omp parallel for
+    // redistribute flow post-redistribution (for unused flow)
+    #pragma omp parallel for
     for (int i = 0; i < commodities.size(); ++i) {
         if (unusedFlow[i] > 0) {
             const string& source = commodities[i].first;
             const string& destination = commodities[i].second;
 
             vector<vector<string>> paths = findAllPaths(graph.getEdges(), source, destination);
-            for (const auto& path : paths) {
-                if (unusedFlow[i] <= 0) break;
 
-                double pathCapacity = INF;
-                for (int j = 0; j < path.size() - 1; ++j) {
-                    Edge& edge = graph.getEdge(path[j], path[j + 1]);
-                    pathCapacity = min(pathCapacity, static_cast<double>(edge.capacity - edge.flow));
-                }
+            #pragma omp parallel
+            {
+                #pragma omp critical
+                {
+                    for (const auto& path : paths) {
+                        if (unusedFlow[i] <= 0) break;
 
-                double flowToAdd = min(unusedFlow[i], pathCapacity);
-                if (flowToAdd > 0) {
-                    // Lock the edge while modifying the flow
-                    for (int j = 0; j < path.size() - 1; ++j) {
-                        std::lock_guard<std::mutex> guard(flowMutex);  // Critical section for flow modification
-                        Edge& edge = graph.getEdge(path[j], path[j + 1]);
-                        sendFlow(graph, path, flowToAdd);
+                        double pathCapacity = INF;
+
+                        // Calculate the available capacity in the path
+
+                        for (int j = 0; j < path.size() - 1; ++j) {
+                            Edge& edge = graph.getEdge(path[j], path[j + 1]);
+                            pathCapacity = min(pathCapacity, static_cast<double>(edge.capacity - edge.flow));
+                        }
+
+                        double flowToAdd = min(unusedFlow[i], pathCapacity);
+                        if (flowToAdd > 0) {
+                            // Modify the flow in the path
+                            sendFlow(graph, path, flowToAdd);
+                            unitsDelivered[i] += flowToAdd;
+                            unusedFlow[i] -= flowToAdd;
+                        }
                     }
-                    unitsDelivered[i] += flowToAdd;
-                    unusedFlow[i] -= flowToAdd;
                 }
             }
         }
@@ -331,7 +346,7 @@ void OMP_equalDistributionAlgorithm(NetworkGraph& graph,
     while (moreFlowNeeded) {
         moreFlowNeeded = false;
 
-        // Update success rates in parallel
+        // update success rates in parallel
         #pragma omp parallel for
         for (int i = 0; i < commodities.size(); ++i) {
             if (demands[i] > 0) {
@@ -342,11 +357,11 @@ void OMP_equalDistributionAlgorithm(NetworkGraph& graph,
             }
         }
 
-        // Find commodity with the lowest success rate in parallel
+		// find lowest success rate in parallel
         int lowestIndex = 0;
         #pragma omp parallel for
         for (int i = 1; i < successRates.size(); ++i) {
-        #pragma omp critical
+            #pragma omp critical
             {
                 if (successRates[i] < successRates[lowestIndex]) {
                     lowestIndex = i;
@@ -358,62 +373,54 @@ void OMP_equalDistributionAlgorithm(NetworkGraph& graph,
         const string& destination = commodities[lowestIndex].second;
         double remainingDemand = demands[lowestIndex] - unitsDelivered[lowestIndex];
 
-        // Get all paths from source to destination
         vector<vector<string>> allPaths = findAllPaths(graph.getEdges(), source, destination);
 
-        // Allocate flow using available paths in parallel
+        // flow allocation in parallel
         #pragma omp parallel
         {
             #pragma omp critical
             {
                 for (int i = 0; i < allPaths.size(); ++i) {
+
                     if (remainingDemand <= 0) continue;
 
-                    // Calculate bottleneck capacity
+                    // calculate bottleneck capacity
                     double pathCapacity = INF;
                     for (int j = 0; j < allPaths[i].size() - 1; ++j) {
                         Edge& edge = graph.getEdge(allPaths[i][j], allPaths[i][j + 1]);
+
                         pathCapacity = min(pathCapacity, static_cast<double>(edge.capacity - edge.flow));
                     }
 
                     if (pathCapacity > 0) {
                         moreFlowNeeded = true;
 
-                        // Allocate flow
                         double flowToSend = min(remainingDemand, pathCapacity);
-
-                        // Allocate and print the path in the critical section
                         sendFlow(graph, allPaths[i], flowToSend);
 
-                        // Update demand and track delivered flow
                         unitsDelivered[lowestIndex] += flowToSend;
                         remainingDemand -= flowToSend;
-
-                        // Debugging
-                        cout << "Thread " << omp_get_thread_num() << " processed path " << i + 1 << ": ";
-                        for (const auto& node : allPaths[i]) {
-                            cout << node << " ";
-                        }
-                        cout << endl;
                     }
+
                 }
             }
         }
+        
     }
 
-    cout << "\nFinal Results: Units Successfully Reaching Destinations (Before Redistribution)\n";
+    std::cout << "\nFinal Results: Units Successfully Reaching Destinations (Before Redistribution)\n";
     for (int i = 0; i < commodities.size(); ++i) {
-        cout << "Commodity " << i + 1 << " (From " << commodities[i].first
+        std::cout << "Commodity " << i + 1 << " (From " << commodities[i].first
             << " to " << commodities[i].second << "): "
             << unitsDelivered[i] << "/" << demands[i] << " units\n";
     }
 
-    // Redistribute flow after all paths are processed
+    // redistribute flow to ensure all flow is used
     OMP_redistributeFlowForEqualization(graph, commodities, demands, unitsDelivered, successRates);
 
-    cout << "\nFinal Results: Units Successfully Reaching Destinations (After Redistribution)\n";
+    std::cout << "\nFinal Results: Units Successfully Reaching Destinations (After Redistribution)\n";
     for (int i = 0; i < commodities.size(); ++i) {
-        cout << "Commodity " << i + 1 << " (From " << commodities[i].first
+        std::cout << "Commodity " << i + 1 << " (From " << commodities[i].first
             << " to " << commodities[i].second << "): "
             << unitsDelivered[i] << "/" << demands[i] << " units\n";
     }
