@@ -36,12 +36,12 @@ int main() {
     };
     vector<double> demands = { 20, 15, 20 };  // demands for each commodity
 
-
-
     double ori_start = omp_get_wtime();
     equalDistributionAlgorithm(graph, commodities, demands);
     double ori_end = omp_get_wtime();
     
+	graph.resetFlow();
+
     double omp_start = omp_get_wtime();
     //equalDistributionAlgorithm(graph, commodities, demands);
     OMP_equalDistributionAlgorithm(graph, commodities, demands);
