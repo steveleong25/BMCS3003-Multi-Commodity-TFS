@@ -33,23 +33,21 @@ int main(int argc, char* argv[]) {
 
 	MPI_Init(&argc, &argv);
 
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
 	double start = MPI_Wtime();
 	// Call MPI proportional flow algorithm
-    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
-    // Call your algorithm
-    try {
-	    MPI_equalDistributionAlgorithm(graph, commodities, demands);
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
+	MPI_equalDistributionAlgorithm(graph, commodities, demands, rank, size);
+
 	double end = MPI_Wtime();
 
-    MPI_Barrier(MPI_COMM_WORLD);
 	MPI_Finalize();
-
-	std::cout << "\nMPI Time: " << end - start << endl;
+    if (rank == 0) {
+		cout << "MPI runtime: " << end - start << endl;
+    }
 
 	return 0;
 }

@@ -4,8 +4,8 @@
 #include <vector>
 #include "NetworkGraph.hpp"
 
-void MPI_redistributeFlowForEqualization(NetworkGraph& graph, vector<pair<string, string>>& commodities, vector<double>& demands, vector<double>& unitsDelivered, vector<double>& successRates);
+void MPI_redistributeFlowForEqualization(NetworkGraph& graph, vector<pair<string, string>>& commodities, vector<double>& demands, vector<double>& unitsDelivered, vector<double>& successRates, int rank, int size);
 
-void MPI_equalDistributionAlgorithm(NetworkGraph& graph, vector<pair<string, string>> commodities, vector<double> demands);
+void MPI_equalDistributionAlgorithm(NetworkGraph& graph, vector<pair<string, string>> commodities, vector<double> demands, int rank, int size);
 
 #endif
