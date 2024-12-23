@@ -9,8 +9,9 @@
 using namespace std;
 
 // Declaration of the findShortestPath function
-vector<string> findShortestPath(const vector<Edge>& edges, const string& source, const string& destination);
-void findAllPathsHelper(const string& src, const string& dest, const vector<Edge>& edges, vector<string>& currentPath, vector<vector<string>>& allPaths);
-vector<vector<string>> findAllPaths(const vector<Edge>& edges, const string& src, const string& dest);
+//vector<string> findShortestPath(const vector<Edge>& edges, const string& source, const string& destination);
+//void findAllPathsHelper(const string& src, const string& dest, const vector<Edge>& edges, vector<string>& currentPath, vector<vector<string>>& allPaths);
+//vector<vector<string>> findAllPaths(const vector<Edge>& edges, const string& src, const string& dest);
+vector<int> find_shortest_path(const Graph& g, int source, int destination);
 
 #endif
