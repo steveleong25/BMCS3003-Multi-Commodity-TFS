@@ -135,7 +135,6 @@
     <ClCompile Include="Commodity.cpp" />
     <ClCompile Include="PathFinder.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="NetworkGraph.cpp" />
     <ClCompile Include="PropFlowAlgorithm.cpp" />
   </ItemGroup>
   <ItemGroup>

@@ -127,11 +127,11 @@ Graph graph_test_init() {
     };
 
     std::vector<EdgeProperties> edge_properties = {
-        {10, 20}, {10, 20}, // Weight and capacity for edge 0 <-> 1
+        {10, 10}, {10, 10}, // Weight and capacity for edge 0 <-> 1
         {12, 20}, {12, 20}, // Weight and capacity for edge 1 <-> 2
         {8, 15}, {8, 15},   // Weight and capacity for edge 2 <-> 3
-        {10, 10}, {10, 10}, // Weight and capacity for edge 2 <-> 5
-        {15, 25}, {15, 25}  // Weight and capacity for edge 4 <-> 1
+        {10, 40}, {10, 40}, // Weight and capacity for edge 2 <-> 5
+        {15, 30}, {15, 30}  // Weight and capacity for edge 4 <-> 1
     };
 
     Graph g;
@@ -194,13 +194,17 @@ int main()
 
     //Commodity
     int num_commodities = 3;  // number of commodities
-    int min_demand = 10;      // Minimum demand for a commodity
-    int max_demand = 100;     // Maximum demand for a commodity
+    //int min_demand = 10;      // Minimum demand for a commodity
+    //int max_demand = 100;     // Maximum demand for a commodity
 
     graph_traits<Graph>::vertex_iterator vi, vi_end;
     tie(vi, vi_end) = boost::vertices(g);
 
-    std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g);
+    //std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g);
+	std::vector<Commodity> commodities = {
+		{0, 3, 2},
+		{4, 5, 5},
+	};
 
     for (const auto& commodity : commodities) {
         std::cout << "Commodity: Source = " << commodity.source
@@ -231,6 +235,10 @@ int main()
             }
         }
     }
+
+	double ratio = flowDistributionAlgorithm(g, commodities, 0.01, 0.1);
+
+	cout << "Max ratio: " << ratio << endl;
 
     return 0;
 }
