@@ -41,6 +41,9 @@
     <ClInclude Include="PropFlowAlgorithm.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Cuda_PropFlowAlgorithm.cuh">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Cuda_PropFlowAlgorithm.cu">

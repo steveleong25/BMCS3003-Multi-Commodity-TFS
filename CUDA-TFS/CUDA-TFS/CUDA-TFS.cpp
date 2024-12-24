@@ -2,7 +2,7 @@
 #include "PathFinder.hpp"
 #include "PropFlowAlgorithm.hpp"
 #include "Commodity.hpp"
-//#include "CUDAFlowAlgorithm.hpp"
+#include "Cuda_PropFlowAlgorithm.cuh"
 #include <iostream>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/random.hpp>
@@ -12,7 +12,6 @@
 using namespace std;
 using namespace boost;
 
-// extern "C" double cudaFlowDistributionAlgorithm(Graph & g, vector<Commodity>&commodities, double epsilon, double alpha);
 // Define the graph type
 Graph generate_random_graph(int num_nodes, int num_edges) {
     Graph g(num_nodes);
@@ -178,7 +177,7 @@ int main()
         }
     }
 
-    double ratio = flowDistributionAlgorithm(g, commodities, 0.01, 0.1);
+    double ratio = cudaFlowDistributionAlgorithm(g, commodities, 0.01, 0.1);
 
     cout << "Max ratio: " << ratio << endl;
 
