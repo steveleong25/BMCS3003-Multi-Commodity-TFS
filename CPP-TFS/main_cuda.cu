@@ -5,6 +5,7 @@
 #include <cmath>
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
+#include "Commodity.hpp"
 #include <cuda_runtime.h>
 
 __device__ __host__ void cudaSendFlow(NetworkGraph& graph, const std::vector<std::string>& path, double amount) {

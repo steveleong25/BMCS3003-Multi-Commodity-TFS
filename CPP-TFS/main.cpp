@@ -205,7 +205,7 @@ int main()
 		{0, 3, 2},
 		{4, 5, 5},
 	};
-
+    double omp_start = omp_get_wtime();
     for (const auto& commodity : commodities) {
         std::cout << "Commodity: Source = " << commodity.source
             << ", Destination = " << commodity.destination
@@ -236,9 +236,12 @@ int main()
         }
     }
 
-	double ratio = flowDistributionAlgorithm(g, commodities, 0.01, 0.1);
+	double ratio = OMP_flowDistributionAlgorithm(g, commodities, 0.01, 0.1);
+    
+    double omp_end = omp_get_wtime();
+    double omp_runtime = omp_end - omp_start;
 
 	cout << "Max ratio: " << ratio << endl;
-
+    cout << "Runtime: " << omp_runtime << endl;
     return 0;
 }

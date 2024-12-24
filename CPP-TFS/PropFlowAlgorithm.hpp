@@ -25,4 +25,12 @@ void recalculate_weights(Graph& g, double alpha);
 
 double flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodities, double epsilon, double alpha);
 
+int OMP_calculate_bottleneck(const Graph& g, const std::vector<std::vector<int>>& assigned_paths);
+
+void OMP_normalize_flows(Graph& g, std::vector<std::vector<int>>& assigned_paths, double bottleneck_value);
+
+void OMP_recalculate_weights(Graph& g, double alpha);
+
+double OMP_flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodities, double epsilon, double alpha);
+
 #endif
