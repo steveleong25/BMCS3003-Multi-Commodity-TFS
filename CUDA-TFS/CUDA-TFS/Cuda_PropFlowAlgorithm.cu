@@ -2,164 +2,108 @@
 #include <vector>
 #include <map>
 #include <cmath>
-#include <algorithm>
 #include <cuda_runtime.h>
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "Commodity.hpp"
-#include <device_launch_parameters.h>
-
 
 using namespace std;
 
-__global__ void calculate_bottleneck_kernel(const int* edge_usage, const int* capacities, int num_edges, int* block_results) {
-    extern __shared__ int shared_data[];
+typedef boost::graph_traits<Graph>::edge_descriptor EdgeDescriptor;
 
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int tid = threadIdx.x;
-
-    // Initialize shared memory
-    shared_data[tid] = 0;
-    if (idx < num_edges) {
-        shared_data[tid] = edge_usage[idx] * capacities[idx];
-    }
-    __syncthreads();
-
-    // Perform reduction in shared memory
-    for (int stride = blockDim.x / 2; stride > 0; stride /= 2) {
-        if (tid < stride) {
-            shared_data[tid] = max(shared_data[tid], shared_data[tid + stride]);
+// CUDA kernel to calculate bottleneck values for all edges
+__global__ void calculateBottleneckKernel(EdgeProperties* edgeProperties, int numEdges, double* bottleneckValues) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < numEdges) {
+        if (edgeProperties[idx].flow > 0) {
+            bottleneckValues[idx] = edgeProperties[idx].capacity / edgeProperties[idx].flow;
         }
-        __syncthreads();
-    }
-
-    // Write the result of this block to the global memory
-    if (tid == 0) {
-        block_results[blockIdx.x] = shared_data[0];
+        else {
+            bottleneckValues[idx] = DBL_MAX; // Max value for edges with no flow
+        }
     }
 }
 
-void cudaCalculate_bottleneck(const int* edge_usage, const int* capacities, int num_edges, int& bottleneck_value) {
+// CUDA kernel to normalize flows
+__global__ void normalizeFlowsKernel(EdgeProperties* edgeProperties, int numEdges, double bottleneckValue) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < numEdges) {
+        if (edgeProperties[idx].flow > 0) {
+            edgeProperties[idx].flow *= bottleneckValue;
+        }
+    }
+}
+
+// CUDA kernel to recalculate weights
+__global__ void recalculateWeightsKernel(EdgeProperties* edgeProperties, int numEdges, double alpha) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < numEdges) {
+        double flowRatio = edgeProperties[idx].flow / edgeProperties[idx].capacity;
+        edgeProperties[idx].weight = exp(alpha * flowRatio);
+    }
+}
+
+// Host function to perform flow distribution algorithm using CUDA
+double CUDA_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, double epsilon, double alpha) {
+    double solution = 0.0;
+
+    // Extract edge properties and prepare for CUDA
+    vector<EdgeProperties> edges;
+    for (auto e : boost::make_iterator_range(boost::edges(g))) {
+        edges.push_back(g[e]);
+    }
+
+    int numEdges = edges.size();
+    EdgeProperties* d_edgeProperties;
+    double* d_bottleneckValues;
+
+    // Allocate GPU memory
+    cudaMalloc(&d_edgeProperties, numEdges * sizeof(EdgeProperties));
+    cudaMalloc(&d_bottleneckValues, numEdges * sizeof(double));
+
+    // Copy edge properties to GPU
+    cudaMemcpy(d_edgeProperties, edges.data(), numEdges * sizeof(EdgeProperties), cudaMemcpyHostToDevice);
+
+    // Set up CUDA kernel launch configuration
     int blockSize = 256;
-    int gridSize = (num_edges + blockSize - 1) / blockSize;
-    int* d_block_results;
-    int* h_block_results = new int[gridSize];
+    int numBlocks = (numEdges + blockSize - 1) / blockSize;
 
-    cudaMalloc(&d_block_results, gridSize * sizeof(int));
-
-    calculate_bottleneck_kernel << <gridSize, blockSize, blockSize * sizeof(int) >> > (edge_usage, capacities, num_edges, d_block_results);
-
-    cudaMemcpy(h_block_results, d_block_results, gridSize * sizeof(int), cudaMemcpyDeviceToHost);
-    cudaFree(d_block_results);
-
-    // Final reduction on the host
-    bottleneck_value = 0;
-    for (int i = 0; i < gridSize; ++i) {
-        bottleneck_value = max(bottleneck_value, h_block_results[i]);
-    }
-
-    delete[] h_block_results;
-}
-
-__global__ void normalize_flows_kernel(int* flows, const int* capacities, int num_edges, double bottleneck_value) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx < num_edges) {
-        if (flows[idx] > capacities[idx]) {
-            flows[idx] = flows[idx] / bottleneck_value;
-        }
-    }
-}
-
-__global__ void recalculate_weights_kernel(double* weights, const int* flows, double alpha, int num_edges) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx < num_edges) {
-        weights[idx] = exp(alpha * flows[idx]);
-    }
-}
-
-double cudaFlowDistributionAlgorithm(Graph & g, vector<Commodity>&commodities, double epsilon, double alpha) {
-    int num_edges = boost::num_edges(g);
-    int num_vertices = boost::num_vertices(g);
-
-    vector<vector<int>> assigned_paths;
-    double total_demand = 0.0;
-
-    // Initialize arrays for GPU
-    int* d_edge_usage;
-    int* d_flows;
-    int* d_capacities;
-    double* d_weights;
-
-    cudaMalloc(&d_edge_usage, num_edges * sizeof(int));
-    cudaMalloc(&d_flows, num_edges * sizeof(int));
-    cudaMalloc(&d_capacities, num_edges * sizeof(int));
-    cudaMalloc(&d_weights, num_edges * sizeof(double));
-
-    vector<int> capacities(num_edges, 0);
-    vector<int> flows(num_edges, 0);
-    vector<double> weights(num_edges, 0.0);
-
-    // Copy initial capacities and flows from graph
-    boost::graph_traits<Graph>::edge_iterator ei, ei_end;
-    int idx = 0;
-    for (boost::tie(ei, ei_end) = boost::edges(g); ei != ei_end; ++ei, ++idx) {
-        capacities[idx] = g[*ei].capacity;
-        flows[idx] = g[*ei].flow;
-        weights[idx] = 1.0;  // Initialize weights to 1.0
-    }
-
-
-    cudaMemcpy(d_capacities, capacities.data(), num_edges * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_flows, flows.data(), num_edges * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_weights, weights.data(), num_edges * sizeof(double), cudaMemcpyHostToDevice);
-
-    double prev_max_ratio = 0.0;
+    double prevMaxRatio = 0.0;
     while (true) {
-        int bottleneck_value = 0;
-        cudaCalculate_bottleneck(d_edge_usage, capacities.data(), num_edges, bottleneck_value);
+        // Step 1: Calculate bottleneck value
+        calculateBottleneckKernel << <numBlocks, blockSize >> > (d_edgeProperties, numEdges, d_bottleneckValues);
 
-        // Normalize flows
-        int blockSize = 256;
-        int gridSize = (num_edges + blockSize - 1) / blockSize;
-        normalize_flows_kernel << <gridSize, blockSize >> > (d_flows, d_capacities, num_edges, bottleneck_value);
+        // Copy bottleneck values back to host and find the minimum
+        vector<double> bottleneckValues(numEdges);
+        cudaMemcpy(bottleneckValues.data(), d_bottleneckValues, numEdges * sizeof(double), cudaMemcpyDeviceToHost);
+        double bottleneckValue = *min_element(bottleneckValues.begin(), bottleneckValues.end());
 
-        // Recalculate weights
-        recalculate_weights_kernel << <gridSize, blockSize >> > (d_weights, d_flows, alpha, num_edges);
+        // Step 2: Normalize flows
+        normalizeFlowsKernel << <numBlocks, blockSize >> > (d_edgeProperties, numEdges, bottleneckValue);
 
-        // Check for convergence
-        double max_ratio = static_cast<double>(bottleneck_value) / total_demand;
-        if (fabs(max_ratio - prev_max_ratio) < epsilon) {
-            cudaMemcpy(flows.data(), d_flows, num_edges * sizeof(int), cudaMemcpyDeviceToHost);
-            break;
-        }
-        prev_max_ratio = max_ratio;
+        // Step 3: Recalculate weights
+        recalculateWeightsKernel << <numBlocks, blockSize >> > (d_edgeProperties, numEdges, alpha);
 
-        // Update flows for next iteration
-        for (auto& commodity : commodities) {
-            vector<int> path = find_shortest_path(g, commodity.source, commodity.destination);
-            assigned_paths.push_back(path);
-
-            for (int i = 1; i < path.size(); ++i) {
-
-                auto e = boost::edge(path[i - 1], path[i], g).first;
-
-                std::cout << "Path size: " << path.size() << ", Current i: " << i << std::endl;
-                std::cout << "Flow index: " << idx << std::endl;
-                //if (idx < 0 || idx >= flows.size()) {
-                //    std::cerr << "Error: Index out of range. idx = " << idx << ", size = " << flows.size() << std::endl;
-                //    continue;  // Skip this iteration
-                //}
-                flows[idx] += commodity.demand;
+        // Step 4: Compute maximum ratio after redistribution
+        cudaMemcpy(edges.data(), d_edgeProperties, numEdges * sizeof(EdgeProperties), cudaMemcpyDeviceToHost);
+        double maxRatio = 0.0;
+        for (const auto& edge : edges) {
+            if (edge.flow > 0) {
+                maxRatio = max(maxRatio, static_cast<double>(edge.capacity) / edge.flow);
             }
         }
-        cudaMemcpy(d_flows, flows.data(), num_edges * sizeof(int), cudaMemcpyHostToDevice);
+
+        // Step 5: Check for convergence
+        if (abs(maxRatio - prevMaxRatio) < epsilon) {
+            solution = maxRatio;
+            break;
+        }
+        prevMaxRatio = maxRatio;
     }
 
-    // Clean up
-    cudaFree(d_edge_usage);
-    cudaFree(d_flows);
-    cudaFree(d_capacities);
-    cudaFree(d_weights);
+    // Free GPU memory
+    cudaFree(d_edgeProperties);
+    cudaFree(d_bottleneckValues);
 
-    return prev_max_ratio;
+    return solution;
 }

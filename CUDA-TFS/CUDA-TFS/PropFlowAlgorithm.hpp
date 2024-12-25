@@ -19,10 +19,16 @@
 
 int calculate_bottleneck(const Graph& g, const std::vector<std::vector<int>>& assigned_paths);
 
+bool isFlowExceedingCapacity(Graph& g);
+
 void normalize_flows(Graph& g, std::vector<std::vector<int>>& assigned_paths, double bottleneck_value);
+
+void updateCommoditiesSent(vector<Commodity>& commodities, double bottleneck_value);
 
 void recalculate_weights(Graph& g, double alpha);
 
 double flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodities, double epsilon, double alpha);
+
+double OMP_flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodities, double epsilon, double alpha);
 
 #endif

@@ -10,6 +10,8 @@
 #include <omp.h>
 
 using namespace std;
+//extern "C" void CUDA_equalDistributionAlgorithm(NetworkGraph & graph, const std::vector<std::pair<std::string, std::string>>&commodities, const std::vector<double>&demands);
+
 using namespace boost;
 
 // Define the graph type
@@ -132,6 +134,7 @@ int main()
     //int num_edges = 24; // Desired number of edges
     //Graph g = generate_random_graph(num_nodes, num_edges);
     Graph g = graph_test_init();
+    Graph g2 = g;
 
     //Commodity
     int num_commodities = 3;  // number of commodities
@@ -143,10 +146,9 @@ int main()
 
     //std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g);
     std::vector<Commodity> commodities = {
-        {0, 3, 2},
+        {0, 3, 20},
         {4, 5, 5},
     };
-
     for (const auto& commodity : commodities) {
         std::cout << "Commodity: Source = " << commodity.source
             << ", Destination = " << commodity.destination
@@ -177,9 +179,39 @@ int main()
         }
     }
 
-    double ratio = cudaFlowDistributionAlgorithm(g, commodities, 0.01, 0.1);
+    /*double omp_start = omp_get_wtime();
+    double ratio = OMP_flowDistributionAlgorithm(g, commodities, 0.01, 0.1);
+    double omp_end = omp_get_wtime();*/
 
-    cout << "Max ratio: " << ratio << endl;
+    double ori_start = omp_get_wtime();
+    double temp = CUDA_flowDistributionAlgorithm(g2, commodities, 0.01, 0.1);
+    double ori_end = omp_get_wtime();
 
+    //double omp_runtime = omp_end - omp_start;
+    double ori_runtime = ori_end - ori_start;
+
+    cout << "In main" << endl;
+    for (auto e : boost::make_iterator_range(boost::edges(g2))) {
+        auto source_node = boost::source(e, g);
+        auto target_node = boost::target(e, g);
+
+        // Get edge properties
+        auto flow = g[e].flow;
+        auto capacity = g[e].capacity;
+
+        std::cout << source_node << " -> " << target_node
+            << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
+    }
+
+    // Step 7: Print all commodities sent
+    for (const auto& commodity : commodities) {
+        std::cout << "Commodity: Source = " << commodity.source
+            << ", Destination = " << commodity.destination << ", Demand = " << commodity.demand
+            << ", Sent = " << commodity.sent << std::endl;
+    }
+
+    cout << "Max ratio: " << temp << endl;
+    cout << "Original Runtime: " << ori_runtime << endl;
+    //cout << "OMP Runtime: " << omp_runtime << endl;
     return 0;
 }
