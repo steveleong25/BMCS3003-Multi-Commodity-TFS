@@ -1,6 +1,6 @@
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
-#include "PropFlowAlgorithm.hpp"
+#include "OMP_FlowAlgorithm.hpp"
 #include "Commodity.hpp"
 //#include "CUDAFlowAlgorithm.hpp"
 #include <iostream>
@@ -62,19 +62,19 @@ Graph generate_random_graph(int num_nodes, int num_edges) {
 
 Graph graph_test_init() {
     std::vector<std::pair<int, int>> edges = {
-        {0, 1}, {1, 0}, // Bidirectional edge between 0 and 1
-        {1, 2}, {2, 1}, // Bidirectional edge between 1 and 2
-        {2, 3}, {3, 2}, // Bidirectional edge between 2 and 3
-        {2, 5}, {5, 2}, // Bidirectional edge between 2 and 5
-        {4, 1}, {1, 4}  // Bidirectional edge between 4 and 1
+        {0, 1}, {1, 0}, // 0 and 1
+        {1, 2}, {2, 1}, // 1 and 2
+        {2, 3}, {3, 2}, // 2 and 3
+        {2, 5}, {5, 2}, // 2 and 5
+        {4, 1}, {1, 4}  // 4 and 1
     };
 
     std::vector<EdgeProperties> edge_properties = {
-        {10, 10}, {10, 10}, // Weight and capacity for edge 0 <-> 1
-        {12, 20}, {12, 20}, // Weight and capacity for edge 1 <-> 2
-        {8, 15}, {8, 15},   // Weight and capacity for edge 2 <-> 3
-        {10, 40}, {10, 40}, // Weight and capacity for edge 2 <-> 5
-        {15, 30}, {15, 30}  // Weight and capacity for edge 4 <-> 1
+        {10, 10}, {10, 10}, //  0 <-> 1
+        {12, 20}, {12, 20}, //  1 <-> 2
+        {8, 15}, {8, 15},   //  2 <-> 3
+        {10, 40}, {10, 40}, //  2 <-> 5
+        {15, 30}, {15, 30}  //  4 <-> 1
     };
 
     Graph g;
@@ -155,7 +155,7 @@ int main()
             << ", Demand = " << commodity.demand << std::endl;
     }
 
-	std::vector<std::vector<int>> shortest_paths;
+	/*std::vector<std::vector<int>> shortest_paths;
     for (int i = 0; i < commodities.size(); i++) {
 		shortest_paths.push_back(find_shortest_path(g, commodities[i].source, commodities[i].destination));
     }
@@ -177,21 +177,23 @@ int main()
                 std::cout << "\n";
             }
         }
-    }
+    }*/
 
-    /*double omp_start = omp_get_wtime();
+    omp_set_num_threads(8);
+
+    double omp_start = omp_get_wtime();
 	double ratio = OMP_flowDistributionAlgorithm(g, commodities, 0.01, 0.1);
-    double omp_end = omp_get_wtime();*/
+    double omp_end = omp_get_wtime();
 
-	double ori_start = omp_get_wtime();
+	/*double ori_start = omp_get_wtime();
 	double temp = flowDistributionAlgorithm(g2, commodities, 0.01, 0.1);
-	double ori_end = omp_get_wtime();
+	double ori_end = omp_get_wtime();*/
 
-    //double omp_runtime = omp_end - omp_start;
-	double ori_runtime = ori_end - ori_start;
+    double omp_runtime = omp_end - omp_start;
+	//double ori_runtime = ori_end - ori_start;
 
 	cout << "In main" << endl;
-    for (auto e : boost::make_iterator_range(boost::edges(g2))) {
+    for (auto e : boost::make_iterator_range(boost::edges(g))) {
         auto source_node = boost::source(e, g);
         auto target_node = boost::target(e, g);
 
@@ -210,8 +212,8 @@ int main()
             << ", Sent = " << commodity.sent << std::endl;
     }
 
-	cout << "Max ratio: " << temp << endl;
-	cout << "Original Runtime: " << ori_runtime << endl;
-    //cout << "OMP Runtime: " << omp_runtime << endl;
+	cout << "Max ratio: " << ratio << endl;
+	//cout << "Original Runtime: " << ori_runtime << endl;
+    cout << "OMP Runtime: " << omp_runtime << endl;
     return 0;
 }

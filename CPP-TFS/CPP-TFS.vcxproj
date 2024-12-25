@@ -132,12 +132,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Commodity.cpp" />
+    <ClCompile Include="OMP_FlowAlgorithm.cpp" />
     <ClCompile Include="PathFinder.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PropFlowAlgorithm.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Commodity.hpp" />
+    <ClInclude Include="OMP_FlowAlgorithm.hpp" />
     <ClInclude Include="PathFinder.hpp" />
     <ClInclude Include="NetworkGraph.hpp" />
     <ClInclude Include="PropFlowAlgorithm.hpp" />

@@ -1,20 +1,16 @@
 #include <iostream>
-#include <map>
 #include <vector>
-#include <omp.h>
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "Commodity.hpp"
 
 using namespace std;
 
-typedef boost::graph_traits<Graph>::edge_descriptor EdgeDescriptor;
-
-double calculate_bottleneck(Graph& g, const std::vector<std::vector<int>>& paths) {
+double calculate_bottleneck(Graph& g) {
     double min_ratio = std::numeric_limits<double>::max();
     for (auto e : boost::make_iterator_range(boost::edges(g))) {
         if (g[e].flow > 0) { // Only consider edges with flow
-            cout << "Capacity: " << g[e].capacity << " Flow: " << g[e].flow << endl;
+            //cout << "Capacity: " << g[e].capacity << " Flow: " << g[e].flow << endl;
             double ratio = (double)g[e].capacity / g[e].flow;
             min_ratio = std::min(min_ratio, ratio);
         }
@@ -22,7 +18,7 @@ double calculate_bottleneck(Graph& g, const std::vector<std::vector<int>>& paths
     return min_ratio;
 }
 
-void normalize_flows(Graph& g, const std::vector<std::vector<int>>& paths, double bottleneck_value) {
+void normalize_flows(Graph& g, double bottleneck_value) {
     for (auto e : boost::make_iterator_range(boost::edges(g))) {
         if (g[e].flow > 0) { // Scale flows only on edges with flow
             g[e].flow *= bottleneck_value;
@@ -54,13 +50,14 @@ bool isFlowExceedingCapacity(Graph& g) {
 
 double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, double epsilon, double alpha) {
     double solution = 0.0;
-    std::vector<std::vector<int>> assigned_paths;
+    //std::vector<std::vector<int>> assigned_paths;
 
     for (auto& commodity : commodities) {
         std::vector<int> path = find_shortest_path(g, commodity.source, commodity.destination);
-        assigned_paths.push_back(path);
+        //assigned_paths.push_back(path);
 
         for (size_t i = 1; i < path.size(); ++i) {
+            cout << "Now processing commodity " << commodity.source << " -> " << commodity.destination << " at path " << i << endl;
             auto e = boost::edge(path[i - 1], path[i], g).first;
             g[e].flow += commodity.demand;
 			commodity.sent = g[e].flow;
@@ -70,24 +67,24 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
     double prev_max_ratio = 0.0;
     while (true) {
         // Step 1: Calculate the bottleneck value
-        double bottleneck_value = calculate_bottleneck(g, assigned_paths);
+        double bottleneck_value = calculate_bottleneck(g);
 
         // Debugging: Print edge states
-        for (auto e : boost::make_iterator_range(boost::edges(g))) {
-            auto source_node = boost::source(e, g);
-            auto target_node = boost::target(e, g);
+        //for (auto e : boost::make_iterator_range(boost::edges(g))) {
+        //    auto source_node = boost::source(e, g);
+        //    auto target_node = boost::target(e, g);
 
-            // Get edge properties
-            auto flow = g[e].flow;
-            auto capacity = g[e].capacity;
+        //    // Get edge properties
+        //    auto flow = g[e].flow;
+        //    auto capacity = g[e].capacity;
 
-            std::cout << source_node << " -> " << target_node
-                << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
-        }
+        //    std::cout << source_node << " -> " << target_node
+        //        << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
+        //}
 
         // Step 2: Normalize flows using the bottleneck value
         if (isFlowExceedingCapacity(g)) {
-            normalize_flows(g, assigned_paths, bottleneck_value);
+            normalize_flows(g, bottleneck_value);
 		    updateCommoditiesSent(commodities, bottleneck_value);
 		}
 
