@@ -1,5 +1,5 @@
-#ifndef PROP_FLOW_ALGORITHM_HPP
-#define PROP_FLOW_ALGORITHM_HPP
+#ifndef MPI_FLOW_ALGORITHM_HPP
+#define MPI_FLOW_ALGORITHM_HPP
 
 #include <vector> 
 #include "NetworkGraph.hpp"
@@ -15,7 +15,7 @@ void updateCommoditiesSent(std::vector<Commodity>& commodities, double bottlenec
 
 void recalculate_weights(Graph& g, double alpha, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow);
 
-double flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodities, double epsilon, double alpha);
+double MPI_flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodities, double epsilon, double alpha);
 
 vector<boost::graph_traits<Graph>::edge_descriptor> get_edges_with_flow(Graph& g);
 

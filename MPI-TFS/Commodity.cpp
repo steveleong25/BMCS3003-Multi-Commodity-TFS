@@ -17,7 +17,7 @@ std::vector<Commodity> generate_random_commodities(int num_commodities, const Gr
     boost::tie(vi, vi_end) = boost::vertices(g);
 
     for (auto v = vi; v != vi_end; ++v) {
-        valid_nodes.push_back(*v);  
+        valid_nodes.push_back(*v);
     }
 
     for (int i = 0; i < num_commodities; ++i) {
@@ -30,7 +30,7 @@ std::vector<Commodity> generate_random_commodities(int num_commodities, const Gr
             destination = valid_nodes[std::rand() % valid_nodes.size()];
         }
 
-		// random number with range
+        // random number with range
         int demand = std::rand() % (max_units - min_units + 1) + min_units;
 
         commodities.push_back(Commodity(source, destination, demand));

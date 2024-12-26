@@ -3,30 +3,26 @@
 
 #include <string>
 #include <vector>
+#include <boost/graph/adjacency_list.hpp>
 
-struct Edge {
-    std::string source;
-    std::string destination;
-    int weight;    // used for shortest path calculations
-    int capacity;  // max flow capacity of the edge
-    int flow;      // current flow of the edge
+using namespace boost;
 
-    Edge(std::string src, std::string dest, int wt, int cap);
+struct EdgeProperties {
+    int weight;
+    int capacity;
+    int flow;
 
-    void setFlow(int newFlow) {
-        flow = newFlow;
-    }
+    EdgeProperties() : weight(0), capacity(0), flow(0) {}
+    EdgeProperties(int w, int cap, int f = 0) : weight(w), capacity(cap), flow(f) {}
 };
 
-class NetworkGraph {
-private:
-    std::vector<Edge> edges;
-
-public:
-    void addEdge(const std::string &src, const std::string &dest, int weight, int capacity);
-    std::vector<Edge> &getEdges();
-    Edge &getEdge(const std::string &src, const std::string &dest);
-    void resetFlow();
-};
+// Define the graph type (using adjacency list)
+typedef boost::adjacency_list<
+    boost::vecS,             // Storage for vertices (using vector)
+    boost::vecS,             // Storage for edges (using vector)
+    boost::directedS,        // Directed graph
+    boost::no_property,      // Vertex properties (no extra properties here)
+    boost::property<boost::edge_weight_t, int, EdgeProperties>  // Edge properties (weight and flow)
+> Graph;
 
 #endif

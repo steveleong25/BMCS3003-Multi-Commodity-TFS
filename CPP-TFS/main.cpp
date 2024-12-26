@@ -1,6 +1,7 @@
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "OMP_FlowAlgorithm.hpp"
+#include "PropFlowAlgorithm.hpp"
 #include "Commodity.hpp"
 //#include "CUDAFlowAlgorithm.hpp"
 #include <iostream>
@@ -15,47 +16,48 @@ using namespace std;
 using namespace boost;
 
 // Define the graph type
-Graph generate_random_graph(int num_nodes, int num_edges) {
+Graph generate_random_graph(long long num_nodes, long long num_edges) {
+    if (num_nodes <= 1) {
+        throw std::invalid_argument("Number of nodes must be greater than 1.");
+    }
+
+    long long max_edges = num_nodes * (num_nodes - 1); // directed graph
+    if (num_edges > max_edges) {
+        std::cerr << "Requested number of edges (" << num_edges
+            << ") exceeds the maximum possible edges (" << max_edges
+            << ") for " << num_nodes << " nodes.\n";
+        num_edges = max_edges; // adjust num_edges to the maximum
+        std::cout << "Reducing number of edges to " << num_edges << ".\n";
+    }
+
     Graph g(num_nodes);
     boost::random::mt19937 gen;
-    boost::random::uniform_int_distribution<> dist_weight(1, 10);  // Weight range [1, 10]
+    boost::random::uniform_int_distribution<> dist_weight(1, 20);  // Weight range [1, 10]
     boost::random::uniform_int_distribution<> dist_capacity(10, 50); // Capacity range [10, 50]
 
+    long long edge_count = 0;
+
+    cout << "Initializing edges..." << endl;
     // Generate random edges
-    for (int i = 0; i < num_edges; ++i) {
+    while (edge_count < num_edges) {
         int u = gen() % num_nodes; //source
 		int v = gen() % num_nodes; //destination
 
         if (u != v) {
-            auto e = boost::add_edge(u, v, g).first;
-            g[e].capacity = dist_capacity(gen);  // Set the capacity for the edge
-            g[e].flow = 0;  // Initialize the flow to 0
+            auto [edge, exists] = boost::edge(u, v, g);
+            if (!exists) {
+                // Add the edge if it doesn't exist
+                auto e = boost::add_edge(u, v, g).first;
+                g[e].capacity = dist_capacity(gen);  // Set the capacity for the edge
+                g[e].flow = 0;  // Initialize the flow to 0
 
-            put(boost::edge_weight, g, e, dist_weight(gen));
+                put(boost::edge_weight, g, e, dist_weight(gen));
+                edge_count++;
+            }
         }
     }
 
-    std::cout << "Graph with " << num_nodes << " nodes and " << num_edges << " edges created." << std::endl;
-
-    std::cout << "Nodes in the graph: ";
-    for (auto v : boost::make_iterator_range(boost::vertices(g))) {
-        std::cout << v << " ";
-    }
-    std::cout << "\n";
-
-    // Verify edges
-    std::cout << "Edges in the graph:\n";
-    for (auto e : boost::make_iterator_range(boost::edges(g))) {
-        auto source_node = boost::source(e, g);
-        auto target_node = boost::target(e, g);
-
-        // Get edge properties
-        auto weight = get(boost::edge_weight, g, e);
-        auto capacity = g[e].capacity;
-
-        std::cout << source_node << " -> " << target_node
-            << " [Weight: " << weight << ", Capacity: " << capacity << "]\n";
-    }
+    cout << "Graph with " << num_nodes << " nodes and " << num_edges << " edges created." << endl;
 
     return g;
 }
@@ -86,134 +88,68 @@ Graph graph_test_init() {
 		put(boost::edge_weight, g, e, edge_properties[i].weight);
     }
 
-    /*auto e = boost::add_edge(0, 1, g).first;
-    g[e].capacity = 20;
-    g[e].flow = 0;  
-    put(boost::edge_weight, g, e, 10);
-    
-    auto e1 = boost::add_edge(1, 2, g).first;
-    g[e1].capacity = 20;
-    g[e1].flow = 0;  
-    put(boost::edge_weight, g, e1, 12);
-    
-    auto e2 = boost::add_edge(2, 3, g).first;
-    g[e2].capacity = 15;
-    g[e2].flow = 0;  
-    put(boost::edge_weight, g, e2, 8);
-    
-    auto e3 = boost::add_edge(4, 1, g).first;
-    g[e3].capacity = 25;
-    g[e3].flow = 0;  
-    put(boost::edge_weight, g, e3, 15);
-    
-    auto e4 = boost::add_edge(2, 5, g).first;
-    g[e4].capacity = 10;
-    g[e4].flow = 0;  
-    put(boost::edge_weight, g, e4, 10);*/
-
-    std::cout << "Edges in the graph:\n";
-    for (auto e : boost::make_iterator_range(boost::edges(g))) {
-        auto source_node = boost::source(e, g);
-        auto target_node = boost::target(e, g);
-
-        // Get edge properties
-        auto weight = get(boost::edge_weight, g, e);
-        auto capacity = g[e].capacity;
-
-        std::cout << source_node << " -> " << target_node
-            << " [Weight: " << weight << ", Capacity: " << capacity << "]\n";
-    }
-
     return g;
 }
 
 int main() 
 {
-    //Graph
-    //int num_nodes = 6; // Adjust nodes
-    //int num_edges = 24; // Desired number of edges
-    //Graph g = generate_random_graph(num_nodes, num_edges);
-    Graph g = graph_test_init();    
-    Graph g2 = g;
+    try {
+        //Graph
+        long long num_nodes = 10000; // adjust nodes
+        long long num_edges = 4000000; // desired number of edges
+        //Graph g = graph_test_init();    
+        Graph g = generate_random_graph(num_nodes, num_edges);
+        Graph g2 = g;
 
-    //Commodity
-    int num_commodities = 3;  // number of commodities
-    //int min_demand = 10;      // Minimum demand for a commodity
-    //int max_demand = 100;     // Maximum demand for a commodity
+        //Commodity
+        int num_commodities = 6;  // number of commodities
+        int min_demand = 10;      // minimum demand for a commodity
+        int max_demand = 100;     // maximum demand for a commodity
 
-    graph_traits<Graph>::vertex_iterator vi, vi_end;
-    tie(vi, vi_end) = boost::vertices(g);
+        graph_traits<Graph>::vertex_iterator vi, vi_end;
+        tie(vi, vi_end) = boost::vertices(g);
 
-    //std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g);
-	std::vector<Commodity> commodities = {
-		{0, 3, 20},
-		{4, 5, 5},
-	};
-    for (const auto& commodity : commodities) {
-        std::cout << "Commodity: Source = " << commodity.source
-            << ", Destination = " << commodity.destination
-            << ", Demand = " << commodity.demand << std::endl;
-    }
+        std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
+	    /*std::vector<Commodity> commodities = {
+		    {0, 3, 20},
+		    {4, 5, 5},
+	    };*/
 
-	/*std::vector<std::vector<int>> shortest_paths;
-    for (int i = 0; i < commodities.size(); i++) {
-		shortest_paths.push_back(find_shortest_path(g, commodities[i].source, commodities[i].destination));
-    }
-
-    if (!shortest_paths.empty()) {
-        for (size_t i = 0; i < shortest_paths.size(); ++i) {
-            std::cout << "Shortest path from " << commodities[i].source << " to " << commodities[i].destination << ":\n";
-
-            if (shortest_paths[i].empty()) {
-                std::cout << "No valid path found.\n";
-            }
-            else {
-                for (size_t j = 0; j < shortest_paths[i].size(); ++j) {
-                    std::cout << shortest_paths[i][j];
-                    if (j < shortest_paths[i].size() - 1) {
-                        std::cout << " -> ";
-                    }
-                }
-                std::cout << "\n";
-            }
+        cout << "\n== Initial Commodities before Flow Distribution ==" << endl;
+        for (const auto& commodity : commodities) {
+            cout << "Commodity: Source = " << commodity.source
+                << ", Destination = " << commodity.destination
+                << ", Demand = " << commodity.demand << endl;
         }
-    }*/
 
-    omp_set_num_threads(8);
+        double ori_start = omp_get_wtime();
+        double ori_ratio = flowDistributionAlgorithm(g2, commodities, 0.01, 0.1);
+        double ori_end = omp_get_wtime();
 
-    double omp_start = omp_get_wtime();
-	double ratio = OMP_flowDistributionAlgorithm(g, commodities, 0.01, 0.1);
-    double omp_end = omp_get_wtime();
+        omp_set_num_threads(8);
+        double omp_start = omp_get_wtime();
+        double ratio = OMP_flowDistributionAlgorithm(g, commodities, 0.01, 0.1);
+        double omp_end = omp_get_wtime();
 
-	/*double ori_start = omp_get_wtime();
-	double temp = flowDistributionAlgorithm(g2, commodities, 0.01, 0.1);
-	double ori_end = omp_get_wtime();*/
+        double omp_runtime = omp_end - omp_start;
+        double ori_runtime = ori_end - ori_start;
 
-    double omp_runtime = omp_end - omp_start;
-	//double ori_runtime = ori_end - ori_start;
+        // print all commodities sent
+        cout << "\n== Commodities after Flow Distribution ==" << endl;
+        for (const auto& commodity : commodities) {
+            cout << "Commodity: Source = " << commodity.source
+                << ", Destination = " << commodity.destination << ", Demand = " << commodity.demand
+                << ", Sent = " << commodity.sent << endl;
+        }
 
-	cout << "In main" << endl;
-    for (auto e : boost::make_iterator_range(boost::edges(g))) {
-        auto source_node = boost::source(e, g);
-        auto target_node = boost::target(e, g);
-
-        // Get edge properties
-        auto flow = g[e].flow;
-        auto capacity = g[e].capacity;
-
-        std::cout << source_node << " -> " << target_node
-            << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
+	    cout << "Max ratio (OMP): " << ratio << endl;
+	    cout << "Max ratio (Original): " << ori_ratio << endl;
+	    cout << "Original Runtime: " << ori_runtime << endl;
+        cout << "OMP Runtime: " << omp_runtime << endl;
+    }
+    catch (const std::invalid_argument& e) {
+        std::cerr << "Error: " << e.what() << endl;
     }
 
-    // Step 7: Print all commodities sent
-    for (const auto& commodity : commodities) {
-        std::cout << "Commodity: Source = " << commodity.source
-            << ", Destination = " << commodity.destination << ", Demand = " << commodity.demand
-            << ", Sent = " << commodity.sent << std::endl;
-    }
-
-	cout << "Max ratio: " << ratio << endl;
-	//cout << "Original Runtime: " << ori_runtime << endl;
-    cout << "OMP Runtime: " << omp_runtime << endl;
     return 0;
 }
