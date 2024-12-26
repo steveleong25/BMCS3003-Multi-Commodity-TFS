@@ -27,6 +27,9 @@
     <ClCompile Include="PropFlowAlgorithm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="OMP_FlowAlgorithm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Commodity.hpp">
@@ -42,6 +45,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Cuda_PropFlowAlgorithm.cuh">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="OMP_FlowAlgorithm.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

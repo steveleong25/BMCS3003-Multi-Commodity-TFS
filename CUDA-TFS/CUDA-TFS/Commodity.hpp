@@ -19,7 +19,7 @@ struct Commodity {
 };
 
 // generate random commodities
-std::vector<Commodity> generate_random_commodities(int num_commodities, const Graph& g);
+std::vector<Commodity> generate_random_commodities(int num_commodities, const Graph& g, int min_units, int max_units);
 
 #endif
 

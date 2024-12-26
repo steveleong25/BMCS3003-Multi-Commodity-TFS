@@ -1,20 +1,15 @@
 #include <iostream>
-#include <map>
 #include <vector>
-#include <omp.h>
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "Commodity.hpp"
 
 using namespace std;
 
-typedef boost::graph_traits<Graph>::edge_descriptor EdgeDescriptor;
-
-double calculate_bottleneck(Graph& g, const std::vector<std::vector<int>>& paths) {
+double calculate_bottleneck(Graph& g, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
     double min_ratio = std::numeric_limits<double>::max();
-    for (auto e : boost::make_iterator_range(boost::edges(g))) {
-        if (g[e].flow > 0) { // Only consider edges with flow
-            cout << "Capacity: " << g[e].capacity << " Flow: " << g[e].flow << endl;
+    for (auto e : edges_with_flow) {
+        if (g[e].flow > 0) { 
             double ratio = (double)g[e].capacity / g[e].flow;
             min_ratio = std::min(min_ratio, ratio);
         }
@@ -22,9 +17,9 @@ double calculate_bottleneck(Graph& g, const std::vector<std::vector<int>>& paths
     return min_ratio;
 }
 
-void normalize_flows(Graph& g, const std::vector<std::vector<int>>& paths, double bottleneck_value) {
-    for (auto e : boost::make_iterator_range(boost::edges(g))) {
-        if (g[e].flow > 0) { // Scale flows only on edges with flow
+void normalize_flows(Graph& g, double bottleneck_value, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
+    for (auto e : edges_with_flow) {
+        if (g[e].flow > 0) {
             g[e].flow *= bottleneck_value;
         }
     }
@@ -36,15 +31,15 @@ void updateCommoditiesSent(vector<Commodity>& commodities, double bottleneck_val
 	}
 }
 
-void recalculate_weights(Graph& g, double alpha) {
-    for (auto e : boost::make_iterator_range(boost::edges(g))) {
+void recalculate_weights(Graph& g, double alpha, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
+    for (auto e : edges_with_flow) {
         double flow_ratio = g[e].flow / g[e].capacity;
-        g[e].weight = std::exp(alpha * flow_ratio); // Exponential weight update
+        g[e].weight = std::exp(alpha * flow_ratio); // exponential weight
     }
 }
 
-bool isFlowExceedingCapacity(Graph& g) {
-	for (auto e : boost::make_iterator_range(boost::edges(g))) {
+bool isFlowExceedingCapacity(Graph& g, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
+	for (auto e : edges_with_flow) {
 		if (g[e].flow > g[e].capacity) {
 			return true;
 		}
@@ -52,13 +47,23 @@ bool isFlowExceedingCapacity(Graph& g) {
 	return false;
 }
 
+vector<boost::graph_traits<Graph>::edge_descriptor> get_edges_with_flow(Graph& g) {
+    vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow;
+
+    for (auto e : boost::make_iterator_range(boost::edges(g))) {
+        if (g[e].flow > 0) {
+            edges_with_flow.push_back(e);
+        }
+    }
+
+    return edges_with_flow;
+}
+
 double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, double epsilon, double alpha) {
     double solution = 0.0;
-    std::vector<std::vector<int>> assigned_paths;
 
     for (auto& commodity : commodities) {
         std::vector<int> path = find_shortest_path(g, commodity.source, commodity.destination);
-        assigned_paths.push_back(path);
 
         for (size_t i = 1; i < path.size(); ++i) {
             auto e = boost::edge(path[i - 1], path[i], g).first;
@@ -67,56 +72,58 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
         }
     }
 
+    vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = get_edges_with_flow(g);
+
     double prev_max_ratio = 0.0;
     while (true) {
-        // Step 1: Calculate the bottleneck value
-        double bottleneck_value = calculate_bottleneck(g, assigned_paths);
+        // calculate the bottleneck value
+        double bottleneck_value = calculate_bottleneck(g, edges_with_flow);
 
-        // Debugging: Print edge states
-        for (auto e : boost::make_iterator_range(boost::edges(g))) {
-            auto source_node = boost::source(e, g);
-            auto target_node = boost::target(e, g);
-
-            // Get edge properties
-            auto flow = g[e].flow;
-            auto capacity = g[e].capacity;
-
-            std::cout << source_node << " -> " << target_node
-                << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
-        }
-
-        // Step 2: Normalize flows using the bottleneck value
-        if (isFlowExceedingCapacity(g)) {
-            normalize_flows(g, assigned_paths, bottleneck_value);
+        // normalize flows 
+        if (isFlowExceedingCapacity(g, edges_with_flow)) {
+            normalize_flows(g, bottleneck_value, edges_with_flow);
 		    updateCommoditiesSent(commodities, bottleneck_value);
 		}
 
+        for (auto e : edges_with_flow) {
+            auto source_node = boost::source(e, g);
+            auto target_node = boost::target(e, g);
 
-        // Step 3: Recalculate weights
-        recalculate_weights(g, alpha);
+            auto flow = g[e].flow;
+            auto capacity = g[e].capacity;
 
-        // Step 4: Compute the maximum ratio after redistribution
-        double max_ratio = 0.0;
-        double highest_flow = 0.0;
-        boost::graph_traits<Graph>::edge_iterator ei, ei_end;
-
-        // Iterate through all edges in the graph
-        for (boost::tie(ei, ei_end) = boost::edges(g); ei != ei_end; ++ei) {
-            auto edge = g[*ei];  // Get the edge
-
-            double total_flow_on_edge = edge.flow;  // Flow on this edge
-            double edge_capacity = edge.capacity;  // Capacity of the edge
-
-            // Check if this edge has more flow than the previous highest flow
-            if (total_flow_on_edge > highest_flow) {
-                highest_flow = total_flow_on_edge;
-
-                // Calculate max ratio: capacity of bottleneck edge / total flow on the bottleneck edge
-                max_ratio = edge_capacity / total_flow_on_edge;
+            if (g[e].flow > 0) {
+                std::cout << source_node << " -> " << target_node
+                    << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
             }
         }
 
-        // Step 5: Check for convergence
+        // recalculate weights
+        recalculate_weights(g, alpha, edges_with_flow);
+
+        // compute the maximum ratio after redistribution
+        double max_ratio = 0.0;
+        double highest_flow = 0.0, min_capacity = 0.0;
+        boost::graph_traits<Graph>::edge_iterator ei, ei_end;
+
+        for (auto e : edges_with_flow) {
+            double total_flow_on_edge = g[e].flow;
+            double edge_capacity = g[e].capacity;
+
+            if (total_flow_on_edge > highest_flow) {
+                highest_flow = total_flow_on_edge;
+                min_capacity = edge_capacity;
+                max_ratio = edge_capacity / total_flow_on_edge; 
+            }
+            else if (total_flow_on_edge == highest_flow) {
+                if (edge_capacity < min_capacity) {
+                    min_capacity = edge_capacity;
+                    max_ratio = edge_capacity / total_flow_on_edge; 
+                }
+            }
+        }
+
+        // convergence
         if (std::abs(max_ratio - prev_max_ratio) < epsilon) {
             solution = max_ratio;
             break;

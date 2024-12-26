@@ -107,6 +107,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>C:\Program Files\boost\boost_1_82_0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -137,6 +138,7 @@
   <ItemGroup>
     <ClCompile Include="Commodity.cpp" />
     <ClCompile Include="CUDA-TFS.cpp" />
+    <ClCompile Include="OMP_FlowAlgorithm.cpp" />
     <ClCompile Include="PathFinder.cpp" />
     <ClCompile Include="PropFlowAlgorithm.cpp" />
   </ItemGroup>
@@ -144,6 +146,7 @@
     <ClInclude Include="Commodity.hpp" />
     <ClInclude Include="Cuda_PropFlowAlgorithm.cuh" />
     <ClInclude Include="NetworkGraph.hpp" />
+    <ClInclude Include="OMP_FlowAlgorithm.hpp" />
     <ClInclude Include="PathFinder.hpp" />
     <ClInclude Include="PropFlowAlgorithm.hpp" />
   </ItemGroup>

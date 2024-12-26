@@ -6,10 +6,10 @@
 #include <cstdlib>
 #include <ctime>
 
-std::vector<Commodity> generate_random_commodities(int num_commodities, const Graph& g) {
+std::vector<Commodity> generate_random_commodities(int num_commodities, const Graph& g, int min_units, int max_units) {
     std::vector<Commodity> commodities;
 
-    // Random number generator setup
+    // random number generator setup
     //std::srand(std::time(0));
 
     std::vector<int> valid_nodes;
@@ -30,8 +30,8 @@ std::vector<Commodity> generate_random_commodities(int num_commodities, const Gr
             destination = valid_nodes[std::rand() % valid_nodes.size()];
         }
 
-		// range of 10 to 50
-        int demand = std::rand() % 40 + 10;
+		// random number with range
+        int demand = std::rand() % (max_units - min_units + 1) + min_units;
 
         commodities.push_back(Commodity(source, destination, demand));
     }
