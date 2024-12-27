@@ -14,7 +14,7 @@ std::vector<int> find_shortest_path(const Graph& g, int source, int destination)
     if (source < 0 || source >= boost::num_vertices(g) ||
         destination < 0 || destination >= boost::num_vertices(g)) {
         std::cerr << "Invalid source or destination vertex." << std::endl;
-        return {}; // Return empty vector for invalid input
+        return {}; // return empty vector for invalid input
     }
 
     std::vector<int> distances(boost::num_vertices(g));
@@ -27,7 +27,7 @@ std::vector<int> find_shortest_path(const Graph& g, int source, int destination)
 
     if (distances[destination] == std::numeric_limits<int>::max()) {
         std::cout << "No path exists.\n";
-        return {}; // Return empty vector if no path exists
+        return {}; // return empty vector if no path exists
     }
 
     std::vector<int> path;

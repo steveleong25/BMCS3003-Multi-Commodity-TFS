@@ -147,16 +147,16 @@ void init_OMP_n_single_thread_with_large_data(Graph g, vector<Commodity> commodi
 
 int main() {
     try {
-        //Graph
+        // Graph
         long long num_nodes = 250; // adjust nodes
         long long num_edges = 625000; // desired number of edges
         Graph g = graph_test_init();    
         //Graph g = generate_random_graph(num_nodes, num_edges);
 
-        //Commodity
-        int num_commodities = 20;  // number of commodities
-        int min_demand = 10;      // minimum demand for a commodity
-        int max_demand = 100;     // maximum demand for a commodity
+        // Commodity
+        int num_commodities = 20;   // number of commodities
+        int min_demand = 10;        // minimum demand for a commodity
+        int max_demand = 100;       // maximum demand for a commodity
 
         //std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
 	    std::vector<Commodity> commodities = {
@@ -190,8 +190,8 @@ int main() {
         cout << "Original Runtime: " << ori_runtime << endl;
         cout << "OMP Runtime: " << omp_runtime << endl;
 
-        //write into file
-        std::ofstream mainFile("..\\Python-TFS\\omp_st.txt");
+        // write into file
+        std::ofstream mainFile("..\\Python-TFS\\cuda_omp_st.txt");
         std::ofstream ompFile("..\\Python-TFS\\omp.txt", std::ios::app);
         std::ofstream stFile("..\\Python-TFS\\st.txt", std::ios::app);
 
@@ -200,14 +200,14 @@ int main() {
             return -1;
         }
 
-        // Write some text to the file
+        // write some text to the file
         mainFile << "ST, " << ori_runtime << std::endl;
         mainFile << "OMP, " << omp_runtime << std::endl;
 
         ompFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << omp_runtime << ")" << endl;
         stFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << ori_runtime << ")" << endl;
 
-        // Close the file
+        // close the file
         mainFile.close();
         ompFile.close();
         stFile.close();

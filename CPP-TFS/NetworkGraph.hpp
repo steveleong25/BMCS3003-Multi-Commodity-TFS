@@ -16,13 +16,13 @@ struct EdgeProperties {
 	EdgeProperties(int w, int cap, int f = 0) : weight(w), capacity(cap), flow(f) {}
 };
 
-// Define the graph type (using adjacency list)
+// define the graph type (using adjacency list)
 typedef boost::adjacency_list<
-    boost::vecS,             // Storage for vertices (using vector)
-    boost::vecS,             // Storage for edges (using vector)
-    boost::directedS,        // Directed graph
-    boost::no_property,      // Vertex properties (no extra properties here)
-    boost::property<boost::edge_weight_t, int, EdgeProperties>  // Edge properties (weight and flow)
+    boost::vecS,             // storage for vertices (using vector)
+    boost::vecS,             // storage for edges (using vector)
+    boost::directedS,        // directed graph
+    boost::no_property,      // vertex properties (no extra properties here)
+    boost::property<boost::edge_weight_t, int, EdgeProperties>  // edge properties (weight and flow)
 > Graph;
 
 #endif
