@@ -1,17 +1,16 @@
 #include <iostream>
 #include <vector>
-#include <cmath>
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "Commodity.hpp"
 
 using namespace std;
-const int INITIAL_WEIGHT = 5;
+const int INIT_WEIGHT = 5;
 
 double calculate_bottleneck(Graph& g, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
     double min_ratio = std::numeric_limits<double>::max();
     for (auto e : edges_with_flow) {
-        if (g[e].flow > 0) { 
+        if (g[e].flow > 0) {
             double ratio = (double)g[e].capacity / g[e].flow;
             min_ratio = std::min(min_ratio, ratio);
         }
@@ -28,30 +27,30 @@ void normalize_flows(Graph& g, double bottleneck_value, vector<boost::graph_trai
 }
 
 void updateCommoditiesSent(vector<Commodity>& commodities, double bottleneck_value) {
-	for (auto& commodity : commodities) {
-	    commodity.sent *= bottleneck_value;
-	}
-}
-
-void updateCommoditiesDemand(vector<Commodity>& commodities) {
     for (auto& commodity : commodities) {
-        commodity.demand = commodity.init_demand - commodity.sent;
+        commodity.sent *= bottleneck_value;
     }
 }
 
 void recalculate_weights(Graph& g, double alpha, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
     for (auto e : edges_with_flow) {
-        g[e].weight = std::min(INITIAL_WEIGHT * (int)ceil(std::exp(alpha * g[e].flow)), INT_MAX);
+        g[e].weight = std::min(INIT_WEIGHT * (int)ceil(std::exp(alpha * g[e].flow)), INT_MAX); // exponential weight
     }
 }
 
 bool isFlowExceedingCapacity(Graph& g, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
-	for (auto e : edges_with_flow) {
-		if (g[e].flow > g[e].capacity) {
-			return true;
-		}
-	}
-	return false;
+    for (auto e : edges_with_flow) {
+        if (g[e].flow > g[e].capacity) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void updateCommoditiesDemand(vector<Commodity>& commodities) {
+    for (auto c : commodities) {
+        c.demand = c.init_demand - c.sent;
+    }
 }
 
 vector<boost::graph_traits<Graph>::edge_descriptor> get_edges_with_flow(Graph& g) {
@@ -77,24 +76,12 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
             for (size_t i = 1; i < path.size(); ++i) {
                 auto e = boost::edge(path[i - 1], path[i], g).first;
                 g[e].flow += commodity.demand;
-                commodity.sent = commodity.demand;
-
-                std::cout << "Assigned flow to edge (" << path[i - 1] << ", " << path[i]
-                    << ") with flow = " << g[e].flow << std::endl;
+                commodity.sent = g[e].flow;
             }
         }
 
         vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = get_edges_with_flow(g);
-        // calculate the bottleneck value
-        double bottleneck_value = calculate_bottleneck(g, edges_with_flow);
 
-        // normalize flows 
-        if (isFlowExceedingCapacity(g, edges_with_flow)) {
-            normalize_flows(g, bottleneck_value, edges_with_flow);
-		    updateCommoditiesSent(commodities, bottleneck_value);
-		}
-
-        updateCommoditiesDemand(commodities);
         for (auto e : edges_with_flow) {
             auto source_node = boost::source(e, g);
             auto target_node = boost::target(e, g);
@@ -107,6 +94,17 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
                     << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
             }
         }
+
+        // calculate the bottleneck value
+        double bottleneck_value = calculate_bottleneck(g, edges_with_flow);
+
+        // normalize flows 
+        if (isFlowExceedingCapacity(g, edges_with_flow)) {
+            normalize_flows(g, bottleneck_value, edges_with_flow);
+            updateCommoditiesSent(commodities, bottleneck_value);
+        }
+
+        updateCommoditiesDemand(commodities);
 
         // recalculate weights
         recalculate_weights(g, alpha, edges_with_flow);
@@ -123,18 +121,26 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
             if (total_flow_on_edge > highest_flow) {
                 highest_flow = total_flow_on_edge;
                 min_capacity = edge_capacity;
-                max_ratio = edge_capacity / total_flow_on_edge; 
+                max_ratio = edge_capacity / total_flow_on_edge;
             }
             else if (total_flow_on_edge == highest_flow) {
                 if (edge_capacity < min_capacity) {
                     min_capacity = edge_capacity;
-                    max_ratio = edge_capacity / total_flow_on_edge; 
+                    max_ratio = edge_capacity / total_flow_on_edge;
                 }
             }
         }
 
+        bool allFulfilled = true;
+        for (auto& commodity : commodities) {
+            if (commodity.sent != commodity.demand) {
+                allFulfilled = false;
+                break;
+            }
+        }
+
         // convergence
-        if (std::abs(max_ratio - prev_max_ratio) < epsilon) {
+        if (std::abs(max_ratio - prev_max_ratio) < epsilon || allFulfilled) {
             solution = max_ratio;
             break;
         }

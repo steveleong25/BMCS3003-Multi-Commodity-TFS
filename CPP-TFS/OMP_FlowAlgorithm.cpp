@@ -3,17 +3,14 @@
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "Commodity.hpp"
-#include "PropFlowAlgorithm.hpp"
-#include <cmath>
 #include <omp.h>
 
 using namespace std;
-const int INITIAL_WEIGHT = 5;
 
 double parallel_calculate_bottleneck(Graph& g, vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow) {
     double min_ratio = std::numeric_limits<double>::max();
 
-    #pragma omp parallel
+#pragma omp parallel
     {
         double local_min_ratio = std::numeric_limits<double>::max();
 
@@ -38,16 +35,16 @@ double parallel_calculate_bottleneck(Graph& g, vector<boost::graph_traits<Graph>
 
 void parallel_normalize_flows(Graph& g, double bottleneck_value, vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow) {
     int i;
-    #pragma omp parallel for
+#pragma omp parallel for
     for (i = 0; i < edges_with_flow.size(); i++) {
-        auto e = edges_with_flow[i]; 
+        auto e = edges_with_flow[i];
         g[e].flow *= bottleneck_value;
     }
 }
 
 void parallel_updateCommoditiesSent(vector<Commodity>& commodities, double bottleneck_value) {
     int i;
-    #pragma omp parallel for schedule(dynamic, 64)
+#pragma omp parallel for schedule(dynamic, 64)
     for (i = 0; i < commodities.size(); i++) {
         commodities[i].sent *= bottleneck_value;
     }
@@ -55,10 +52,11 @@ void parallel_updateCommoditiesSent(vector<Commodity>& commodities, double bottl
 
 void parallel_recalculate_weights(Graph& g, double alpha, vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow) {
     int i;
-    #pragma omp parallel for
+#pragma omp parallel for
     for (i = 0; i < edges_with_flow.size(); i++) {
-        auto e = edges_with_flow[i]; 
-        g[e].weight = std::min(INITIAL_WEIGHT * (int)ceil(std::exp(alpha * g[e].flow)), INT_MAX);
+        auto e = edges_with_flow[i];
+        double flow_ratio = g[e].flow / g[e].capacity;
+        g[e].weight = exp(alpha * flow_ratio); // exponential weight 
     }
 }
 
@@ -66,13 +64,13 @@ bool parallel_isFlowExceedingCapacity(Graph& g, vector<boost::graph_traits<Graph
     bool result = false;
     int i;
 
-    #pragma omp parallel for
+#pragma omp parallel for
     for (i = 0; i < edges_with_flow.size(); i++) {
         if (result) continue;
-        
-        auto e = edges_with_flow[i]; 
+
+        auto e = edges_with_flow[i];
         if (g[e].flow > g[e].capacity) {
-            #pragma omp critical
+#pragma omp critical
             {
                 result = true;
             }
@@ -94,14 +92,12 @@ vector<boost::graph_traits<Graph>::edge_descriptor> OMP_get_edges_with_flow(Grap
 }
 
 double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, double epsilon, double alpha) {
-
-    cout << "Parallel" << endl;
     double solution = 0.0;
     int i;
-    double prev_max_ratio = 0.0;
 
+    double prev_max_ratio = 0.0;
     while (true) {
-        #pragma omp parallel for
+        #pragma omp parallel for schedule(dynamic, 64)
         for (i = 0; i < commodities.size(); i++) {
             std::vector<int> path = find_shortest_path(g, commodities[i].source, commodities[i].destination);
             if (path.empty()) continue;
@@ -110,16 +106,11 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
                 auto e = boost::edge(path[j - 1], path[j], g).first;
                 #pragma omp critical
                 {
-                    cout << commodities[i].demand;
                     g[e].flow += commodities[i].demand;
                 }
-                
-
                 commodities[i].sent = g[e].flow;
-                std::cout << "Assigned flow to edge (" << path[j - 1] << ", " << path[j]
-                    << ") with flow = " << g[e].flow << std::endl;
             }
-        }    
+        }
 
         vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = OMP_get_edges_with_flow(g);
 
@@ -131,19 +122,9 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
             parallel_normalize_flows(g, bottleneck_value, edges_with_flow);
             parallel_updateCommoditiesSent(commodities, bottleneck_value);
         }
-        updateCommoditiesDemand(commodities);
 
-        for (auto e : edges_with_flow) {
-            auto source_node = boost::source(e, g);
-            auto target_node = boost::target(e, g);
-
-            auto flow = g[e].flow;
-            auto capacity = g[e].capacity;
-
-            if (g[e].flow > 0) {
-                std::cout << source_node << " -> " << target_node
-                    << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
-            }
+        for (auto c : commodities) {
+            c.demand = c.init_demand - c.sent;
         }
 
         // recalculate weights
@@ -152,17 +133,18 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
         // compute the max ratio after redistribution       
         double max_ratio = 0.0;
         double highest_flow = 0.0;
-        double min_capacity = std::numeric_limits<double>::max(); 
+        double min_capacity = std::numeric_limits<double>::max();
 
         #pragma omp parallel
         {
             double local_max_ratio = 0.0;
             double local_highest_flow = 0.0;
-            double local_min_capacity = std::numeric_limits<double>::max(); 
+            double local_min_capacity = std::numeric_limits<double>::max();
 
             #pragma omp for
             for (i = 0; i < edges_with_flow.size(); ++i) {
                 auto e = edges_with_flow[i];
+                if (g[e].flow == 0) continue;  // skip edges with no flow
 
                 double total_flow_on_edge = g[e].flow;
                 double edge_capacity = g[e].capacity;
@@ -176,7 +158,7 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
                 // if current edge flow is equal to the current highest flow, update by min_capacity
                 else if (total_flow_on_edge == local_highest_flow) {
                     if (edge_capacity < local_min_capacity) {
-                        local_min_capacity = edge_capacity;  
+                        local_min_capacity = edge_capacity;
                         local_max_ratio = edge_capacity / total_flow_on_edge;
                     }
                 }
@@ -187,7 +169,7 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
             {
                 if (local_highest_flow > highest_flow) {
                     highest_flow = local_highest_flow;
-                    min_capacity = local_min_capacity; 
+                    min_capacity = local_min_capacity;
                     max_ratio = local_max_ratio;
                 }
                 else if (local_highest_flow == highest_flow) {
@@ -199,8 +181,16 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
             }
         }
 
+        bool allFulfilled = true;
+        for (auto& commodity : commodities) {
+            if (commodity.sent != commodity.demand) {
+                allFulfilled = false;
+                break;
+            }
+        }
+
         // convergence
-        if (abs(max_ratio - prev_max_ratio) < epsilon) {
+        if (abs(max_ratio - prev_max_ratio) < epsilon || allFulfilled) {
             solution = max_ratio;
             break;
         }

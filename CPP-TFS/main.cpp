@@ -109,7 +109,7 @@ int main()
 
         //std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
 	    std::vector<Commodity> commodities = {
-		    {0, 3, 2},
+		    {0, 3, 20},
 		    {4, 5, 5},
 	    };
         std::vector<Commodity> commodities2 = commodities;
@@ -121,26 +121,16 @@ int main()
                 << ", Demand = " << commodity.demand << endl;
         }
 
-        for (auto e : boost::make_iterator_range(boost::edges(g))) {
-            auto source_node = boost::source(e, g);
-            auto target_node = boost::target(e, g);
-
-            // Get edge properties
-            auto flow = g[e].flow;
-            auto capacity = g[e].capacity;
-
-            std::cout << source_node << " -> " << target_node
-                << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
-        }
-
-        double ori_start = omp_get_wtime();
-        double ori_ratio = flowDistributionAlgorithm(g, commodities, 0.01, 0.12);
-        double ori_end = omp_get_wtime();
 
         omp_set_num_threads(8);
         double omp_start = omp_get_wtime();
         double omp_ratio = OMP_flowDistributionAlgorithm(g2, commodities2, 0.01, 0.12);
         double omp_end = omp_get_wtime();
+
+        double ori_start = omp_get_wtime();
+        double ori_ratio = flowDistributionAlgorithm(g, commodities, 0.01, 0.12);
+        double ori_end = omp_get_wtime();
+
 
         double omp_runtime = omp_end - omp_start;
         double ori_runtime = ori_end - ori_start;
