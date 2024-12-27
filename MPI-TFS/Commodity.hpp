@@ -10,14 +10,14 @@
 struct Commodity {
     int source;
     int destination;
-    int demand;
-    int sent;
+    const double init_demand;
+    double demand;
+    double sent;
 
-    Commodity() 
-        : source(0), destination(0), demand(0), sent(0){
-    }
+    Commodity() : source(0), destination(0), init_demand(0), demand(0), sent(0) {}
+
     Commodity(int src, int dest, int demand_val)
-        : source(src), destination(dest), demand(demand_val), sent(0) {
+        : source(src), destination(dest), demand(demand_val), sent(0), init_demand(demand_val) {
     }
 };
 

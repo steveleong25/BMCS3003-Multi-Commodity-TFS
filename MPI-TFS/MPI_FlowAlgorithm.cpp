@@ -1,134 +1,26 @@
-#include <mpi.h>
-#include <cmath>
-#include <vector>
 #include <iostream>
+#include <vector>
+#include <cmath>
+#include <mpi.h>
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "Commodity.hpp"
 
 using namespace std;
+const int INITIAL_WEIGHT = 5;
 
-// Broadcast a graph to all processes
-void broadcastGraph(Graph& g, int rank) {
-    if (rank == 0) {
-        // Serialize the graph
-        vector<int> edge_data; // To store edge data (source, target, capacity, weight)
-        for (auto e : boost::make_iterator_range(boost::edges(g))) {
-            int source = boost::source(e, g);
-            int target = boost::target(e, g);
-            double capacity = g[e].capacity;
-            double weight = g[e].weight;
-
-            // Flatten the data into integers and doubles
-            edge_data.push_back(source);
-            edge_data.push_back(target);
-            edge_data.push_back(*(int*)&capacity); // Cast double to int
-            edge_data.push_back(*(int*)&weight);  // Cast double to int
-        }
-
-        // Broadcast the number of edges
-        int num_edges = edge_data.size();
-        MPI_Bcast(&num_edges, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-        // Broadcast the serialized graph data
-        MPI_Bcast(edge_data.data(), num_edges, MPI_INT, 0, MPI_COMM_WORLD);
-    }
-    else {
-        // Receive the number of edges
-        int num_edges;
-        MPI_Bcast(&num_edges, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-        // Receive the serialized graph data
-        vector<int> edge_data(num_edges);
-        MPI_Bcast(edge_data.data(), num_edges, MPI_INT, 0, MPI_COMM_WORLD);
-
-        // Deserialize the graph
-        for (size_t i = 0; i < edge_data.size(); i += 4) {
-            int source = edge_data[i];
-            int target = edge_data[i + 1];
-            double capacity = *(double*)&edge_data[i + 2]; // Cast back to double
-            double weight = *(double*)&edge_data[i + 3];  // Cast back to double
-
-            auto e = boost::add_edge(source, target, g).first;
-            g[e].capacity = capacity;
-            g[e].weight = weight;
-        }
-    }
-}
-
-// Broadcast a vector of commodities
-void broadcastCommodities(vector<Commodity>& commodities, int rank) {
-    if (rank == 0) {
-        // Serialize the commodities
-        vector<double> commodity_data; // To store commodity data (source, destination, demand, sent)
-        for (const auto& commodity : commodities) {
-            commodity_data.push_back(commodity.source);
-            commodity_data.push_back(commodity.destination);
-            commodity_data.push_back(commodity.demand);
-            commodity_data.push_back(commodity.sent);
-        }
-
-        // Broadcast the number of commodities
-        int num_commodities = commodity_data.size();
-        MPI_Bcast(&num_commodities, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-        // Broadcast the serialized commodities
-        MPI_Bcast(commodity_data.data(), num_commodities, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    }
-    else {
-        // Receive the number of commodities
-        int num_commodities;
-        MPI_Bcast(&num_commodities, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-        // Receive the serialized commodity data
-        vector<double> commodity_data(num_commodities);
-        MPI_Bcast(commodity_data.data(), num_commodities, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-        // Deserialize the commodities
-        commodities.clear();
-        for (size_t i = 0; i < commodity_data.size(); i += 4) {
-            Commodity commodity;
-            commodity.source = commodity_data[i];
-            commodity.destination = commodity_data[i + 1];
-            commodity.demand = commodity_data[i + 2];
-            commodity.sent = commodity_data[i + 3];
-            commodities.push_back(commodity);
-        }
-    }
-}
-
-// scatter edges among processes
-vector<boost::graph_traits<Graph>::edge_descriptor> scatterEdges(
-    const vector<boost::graph_traits<Graph>::edge_descriptor>& edges,
-    int rank, int size
-) {
-    int total_edges = edges.size();
-    int edges_per_proc = (total_edges + size - 1) / size;
-
-    int start = rank * edges_per_proc;
-    int end = min(start + edges_per_proc, total_edges);
-
-    return vector<boost::graph_traits<Graph>::edge_descriptor>(
-        edges.begin() + start, edges.begin() + end
-    );
-}
-
-double calculate_bottleneck(Graph& g, const vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow) {
+double calculate_bottleneck(Graph& g, vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow) {
     double local_min_ratio = std::numeric_limits<double>::max();
-
     for (auto e : edges_with_flow) {
         if (g[e].flow > 0) {
             double ratio = (double)g[e].capacity / g[e].flow;
             local_min_ratio = std::min(local_min_ratio, ratio);
         }
     }
-
-    double global_min_ratio;
-    MPI_Allreduce(&local_min_ratio, &global_min_ratio, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-    return global_min_ratio;
+    return local_min_ratio;
 }
 
-void normalize_flows(Graph& g, double bottleneck_value, const vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow) {
+void normalize_flows(Graph& g, double bottleneck_value, vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow) {
     for (auto e : edges_with_flow) {
         if (g[e].flow > 0) {
             g[e].flow *= bottleneck_value;
@@ -136,32 +28,31 @@ void normalize_flows(Graph& g, double bottleneck_value, const vector<boost::grap
     }
 }
 
-void updateCommoditiesSent(vector<Commodity>& commodities, double bottleneck_value, int rank, int size) {
+void updateCommoditiesSent(vector<Commodity>& commodities, double bottleneck_value) {
     for (auto& commodity : commodities) {
         commodity.sent *= bottleneck_value;
     }
-    // If global synchronization is needed, use MPI_Allreduce to aggregate results
 }
 
-void recalculate_weights(Graph& g, double alpha, const vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow) {
-    for (auto e : edges_with_flow) {
-        double flow_ratio = g[e].flow / g[e].capacity;
-        g[e].weight = std::exp(alpha * flow_ratio); // exponential weight
+void updateCommoditiesDemand(vector<Commodity>& commodities) {
+    for (auto& commodity : commodities) {
+        commodity.demand = commodity.init_demand - commodity.sent;
     }
 }
 
-bool isFlowExceedingCapacity(Graph& g, const vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow) {
-    bool local_exceeding = false;
+void recalculate_weights(Graph& g, double alpha, vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow) {
+    for (auto e : edges_with_flow) {
+        g[e].weight = std::min(INITIAL_WEIGHT * (int)ceil(std::exp(alpha * g[e].flow)), INT_MAX);
+    }
+}
+
+bool isFlowExceedingCapacity(Graph& g, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
     for (auto e : edges_with_flow) {
         if (g[e].flow > g[e].capacity) {
-            local_exceeding = true;
-            break;
+            return true;
         }
     }
-
-    bool global_exceeding;
-    MPI_Allreduce(&local_exceeding, &global_exceeding, 1, MPI_C_BOOL, MPI_LOR, MPI_COMM_WORLD);
-    return global_exceeding;
+    return false;
 }
 
 vector<boost::graph_traits<Graph>::edge_descriptor> get_edges_with_flow(Graph& g) {
@@ -176,66 +67,100 @@ vector<boost::graph_traits<Graph>::edge_descriptor> get_edges_with_flow(Graph& g
     return edges_with_flow;
 }
 
-// Main MPI flow distribution algorithm
+struct PathFlow {
+    vector<int> path;
+    double flow;
+};
+
 double MPI_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, double epsilon, double alpha, int rank, int size) {
     double solution = 0.0;
-
-    // Step 1: Broadcast graph and commodities to all processes
-    if (rank == 0) {
-        broadcastGraph(g, rank);
-        broadcastCommodities(commodities, rank);
-    }
-    else {
-        broadcastGraph(g, rank);
-        broadcastCommodities(commodities, rank);
-    }
-
-    // Step 2: Scatter edges_with_flow among processes
-    vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = get_edges_with_flow(g);
-    vector<boost::graph_traits<Graph>::edge_descriptor> local_edges = scatterEdges(edges_with_flow, rank, size);
-
     double prev_max_ratio = 0.0;
 
-    while (true) {
-        // Step 3: Calculate bottleneck value
-        double bottleneck_value = calculate_bottleneck(g, local_edges);
+    // Total number of commodities
+    int total_commodities = commodities.size();
 
-        // Step 4: Normalize flows
-        if (isFlowExceedingCapacity(g, local_edges)) {
-            normalize_flows(g, bottleneck_value, local_edges);
-            updateCommoditiesSent(commodities, bottleneck_value, rank, size);
+    // Scatter the commodities
+    int chunk_size = total_commodities / size;
+    int remainder = total_commodities % size;
+
+    int local_commodities_count = chunk_size + (rank < remainder ? 1 : 0);
+
+    vector<Commodity> local_commodities(local_commodities_count);
+
+    int pack_size = local_commodities_count * sizeof(Commodity);
+    char* send_buffer = new char[total_commodities * sizeof(Commodity)];
+    char* recv_buffer = new char[pack_size];
+
+    // Pack data into a buffer
+    if (rank == 0) {
+        int offset = 0;
+        for (int i = 0; i < size; ++i) {
+            int start_idx = i * chunk_size + std::min(i, remainder);  // starting index for this process, take remainder as the last 
+            int end_idx = start_idx + chunk_size + (i < remainder ? 1 : 0); 
+
+            // pack the commodities for the current process
+            for (int j = start_idx; j < end_idx; ++j) {
+                cout << commodities[j].source << " -> " << commodities[j].destination << endl;
+                MPI_Pack(&commodities[j], 1, MPI_BYTE, send_buffer, total_commodities * sizeof(Commodity), &offset, MPI_COMM_WORLD);
+            }
+        }
+    }
+
+    // scatter
+    MPI_Scatter(send_buffer, pack_size, MPI_BYTE, recv_buffer, pack_size, MPI_BYTE, 0, MPI_COMM_WORLD);
+
+    // unpack
+    MPI_Unpack(recv_buffer, pack_size, &pack_size, local_commodities.data(), local_commodities_count, MPI_BYTE, MPI_COMM_WORLD);
+
+    delete[] send_buffer;
+    delete[] recv_buffer;
+
+    while (true) {
+        for (auto& commodity : local_commodities) {
+            std::vector<int> path = find_shortest_path(g, commodity.source, commodity.destination);
+
+            for (size_t j = 1; j < path.size(); ++j) {
+                auto e = boost::edge(path[j - 1], path[j], g).first;
+                g[e].flow += commodity.demand;
+                commodity.sent = commodity.demand;
+            }
         }
 
-        // Step 5: Recalculate weights
-        recalculate_weights(g, alpha, local_edges);
+        vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = get_edges_with_flow(g);
+        double bottleneck_value = calculate_bottleneck(g, edges_with_flow);
 
-        // Step 6: Compute local max ratio
-        double local_max_ratio = 0.0;
-        double local_highest_flow = 0.0;
-        double local_min_capacity = std::numeric_limits<double>::max();
+        if (isFlowExceedingCapacity(g, edges_with_flow)) {
+            normalize_flows(g, bottleneck_value, edges_with_flow);
+            updateCommoditiesSent(local_commodities, bottleneck_value);
+        }
 
-        for (auto e : local_edges) {
+        updateCommoditiesDemand(local_commodities);
+
+        recalculate_weights(g, alpha, edges_with_flow);
+
+        double max_ratio = 0.0;
+        double highest_flow = 0.0, min_capacity = 0.0;
+
+        for (auto e : edges_with_flow) {
             double total_flow_on_edge = g[e].flow;
             double edge_capacity = g[e].capacity;
 
-            if (total_flow_on_edge > local_highest_flow) {
-                local_highest_flow = total_flow_on_edge;
-                local_min_capacity = edge_capacity;
-                local_max_ratio = edge_capacity / total_flow_on_edge;
+            if (total_flow_on_edge > highest_flow) {
+                highest_flow = total_flow_on_edge;
+                min_capacity = edge_capacity;
+                max_ratio = edge_capacity / total_flow_on_edge;
             }
-            else if (total_flow_on_edge == local_highest_flow) {
-                if (edge_capacity < local_min_capacity) {
-                    local_min_capacity = edge_capacity;
-                    local_max_ratio = edge_capacity / total_flow_on_edge;
+            else if (total_flow_on_edge == highest_flow) {
+                if (edge_capacity < min_capacity) {
+                    min_capacity = edge_capacity;
+                    max_ratio = edge_capacity / total_flow_on_edge;
                 }
             }
         }
 
-        // Reduce max ratio across processes
         double global_max_ratio;
-        MPI_Allreduce(&local_max_ratio, &global_max_ratio, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+        MPI_Reduce(&max_ratio, &global_max_ratio, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
-        // Check convergence
         if (rank == 0) {
             if (std::abs(global_max_ratio - prev_max_ratio) < epsilon) {
                 solution = global_max_ratio;
@@ -244,9 +169,11 @@ double MPI_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
             prev_max_ratio = global_max_ratio;
         }
 
-        // Broadcast updated prev_max_ratio to all processes
         MPI_Bcast(&prev_max_ratio, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
+
+    MPI_Gather(local_commodities.data(), local_commodities_count * sizeof(Commodity), MPI_BYTE,
+        commodities.data(), chunk_size * sizeof(Commodity), MPI_BYTE, 0, MPI_COMM_WORLD);
 
     return solution;
 }

@@ -10,29 +10,33 @@ const int INF = std::numeric_limits<int>::max();
 using namespace std;
 
 std::vector<int> find_shortest_path(const Graph& g, int source, int destination) {
-    std::vector<int> distance(boost::num_vertices(g), std::numeric_limits<int>::max());
-    std::vector<int> predecessor(boost::num_vertices(g), -1);
+    if (source < 0 || source >= boost::num_vertices(g) ||
+        destination < 0 || destination >= boost::num_vertices(g)) {
+        std::cerr << "Invalid source or destination vertex." << std::endl;
+        return {}; // Return empty vector for invalid input
+    }
 
-    // Dijkstra's algorithm
+    std::vector<int> distances(boost::num_vertices(g));
+    std::vector<boost::graph_traits<Graph>::vertex_descriptor> predecessors(boost::num_vertices(g));
+
     boost::dijkstra_shortest_paths(g, source,
-        boost::distance_map(&distance[0])
-        .predecessor_map(&predecessor[0])
-    );
+        boost::distance_map(boost::make_iterator_property_map(distances.begin(), boost::get(boost::vertex_index, g))).
+        predecessor_map(boost::make_iterator_property_map(predecessors.begin(), boost::get(boost::vertex_index, g))).
+        weight_map(boost::get(&EdgeProperties::weight, g)));
 
-    // if the destination is unreachable
-    if (distance[destination] == std::numeric_limits<int>::max()) {
-        std::cout << "No path exists from " << source << " to " << destination << ".\n";
-        return {};
+    if (distances[destination] == std::numeric_limits<int>::max()) {
+        std::cout << "No path exists.\n";
+        return {}; // Return empty vector if no path exists
     }
 
-    // reconstruct path from source to destination
     std::vector<int> path;
-    for (int v = destination; v != -1; v = predecessor[v]) {
-        path.push_back(v);
-        // invalid predecessor then break
-        if (v == source) break;
+    boost::graph_traits<Graph>::vertex_descriptor current = destination;
+    while (current != source) {
+        path.push_back(current);
+        current = predecessors[current];
     }
+    path.push_back(source);
+    std::reverse(path.begin(), path.end());
 
-    std::reverse(path.begin(), path.end()); // reverse path
     return path;
 }

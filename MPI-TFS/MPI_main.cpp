@@ -120,24 +120,23 @@ int main(int argc, char* argv[]) {
 
             //std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
             std::vector<Commodity> commodities = {
-                {0, 3, 20},
+                {0, 3, 2},
                 {4, 5, 5},
             };
+
+            // Call parallelized algorithm
+            double solution = MPI_flowDistributionAlgorithm(g, commodities, epsilon, alpha, rank, size);
+
+            if (rank == 0) {
+                cout << "Solution: " << solution << endl;
+            }
         }
         catch (const std::invalid_argument& e) {
             std::cerr << "Error: " << e.what() << endl;
         }
     }
 
-    // Call parallelized algorithm
-    double solution = MPI_flowDistributionAlgorithm(g, commodities, epsilon, alpha, rank, size);
-
-    if (rank == 0) {
-        cout << "Solution: " << solution << endl;
-    }
-
     MPI_Finalize();
     return 0;
-	
-	return 0;
+
 }

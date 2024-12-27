@@ -133,9 +133,9 @@ int main()
                 << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
         }
 
-        /*double ori_start = omp_get_wtime();
+        double ori_start = omp_get_wtime();
         double ori_ratio = flowDistributionAlgorithm(g, commodities, 0.01, 0.12);
-        double ori_end = omp_get_wtime();*/
+        double ori_end = omp_get_wtime();
 
         omp_set_num_threads(8);
         double omp_start = omp_get_wtime();
@@ -143,7 +143,7 @@ int main()
         double omp_end = omp_get_wtime();
 
         double omp_runtime = omp_end - omp_start;
-        //double ori_runtime = ori_end - ori_start;
+        double ori_runtime = ori_end - ori_start;
 
         // print all commodities sent
         cout << "\n== Commodities after Flow Distribution ==" << endl;
@@ -154,8 +154,8 @@ int main()
         }
 
 	    cout << "Max ratio (OMP): " << omp_ratio << endl;
-	    //cout << "Max ratio (Original): " << ori_ratio << endl;
-	    //cout << "Original Runtime: " << ori_runtime << endl;
+	    cout << "Max ratio (Original): " << ori_ratio << endl;
+	    cout << "Original Runtime: " << ori_runtime << endl;
         cout << "OMP Runtime: " << omp_runtime << endl;
     }
     catch (const std::invalid_argument& e) {
