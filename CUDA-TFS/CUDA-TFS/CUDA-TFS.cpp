@@ -103,7 +103,7 @@ int main()
         Graph g3 = g;
 
         //Commodity
-        int num_commodities = 6;  // number of commodities
+        int num_commodities = 3;  // number of commodities
         int min_demand = 10;      // minimum demand for a commodity
         int max_demand = 100;     // maximum demand for a commodity
 
@@ -124,16 +124,16 @@ int main()
         }
         cout << "=========================================" << endl;
         double ori_start = omp_get_wtime();
-        //double ori_ratio = flowDistributionAlgorithm(g, commodities, 0.01, 0.1);
+        double ori_ratio = flowDistributionAlgorithm(g, commodities, 0.01, 0.12);
         double ori_end = omp_get_wtime();
         cout << "=========================================" << endl;
         omp_set_num_threads(10);
         double omp_start = omp_get_wtime();
-        //double omp_ratio = OMP_flowDistributionAlgorithm(g2, commodities, 0.01, 0.1);
+        double omp_ratio = OMP_flowDistributionAlgorithm(g2, commodities, 0.01, 0.12);
         double omp_end = omp_get_wtime();
         cout << "=========================================" << endl;
         double cuda_start = omp_get_wtime();
-        double cuda_ratio = CUDA_flowDistributionAlgorithm(g3, commodities, 0.01, 0.1);
+        double cuda_ratio = CUDA_flowDistributionAlgorithm(g3, commodities, 0.01, 0.12);
         double cuda_end = omp_get_wtime();
         cout << "=========================================" << endl;
         double ori_runtime = ori_end - ori_start;
@@ -148,8 +148,8 @@ int main()
                 << ", Sent = " << commodity.sent << endl;
         }
 
-        //cout << "Max ratio (Original): " << ori_ratio << endl;
-	    //cout << "Max ratio (OMP): " << omp_ratio << endl;
+        cout << "Max ratio (Original): " << ori_ratio << endl;
+	    cout << "Max ratio (OMP): " << omp_ratio << endl;
         cout << "Max ratio (CUDA): " << cuda_ratio << endl;
 	    cout << "Original Runtime: " << ori_runtime << endl;
         cout << "OMP Runtime: " << omp_runtime << endl;
