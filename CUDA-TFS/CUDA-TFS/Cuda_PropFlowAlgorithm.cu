@@ -39,7 +39,7 @@ __global__ void calculate_bottleneck_kernel(double* flow, double* capacity, doub
     // Each thread processes one edge
     if (idx < edge_count && flow[idx] > 0) {
         double ratio = capacity[idx] / flow[idx];
-        local_min = ratio;
+        local_min = fmin(local_min, ratio);
     }
 
     // Store the local minimum in shared memory
@@ -344,7 +344,7 @@ double CUDA_flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodit
         double highest_flow = 0.0, min_capacity = 0.0;
 
         for (size_t i = 0; i < edges_with_flow.size(); ++i) {
-            double total_flow_on_edge = flow[i];
+            double total_flow_on_edge = static_cast<int>(flow[i]);
             double edge_capacity = capacity[i];
 
             if (total_flow_on_edge > highest_flow) {
