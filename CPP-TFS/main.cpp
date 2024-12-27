@@ -4,6 +4,7 @@
 #include "PropFlowAlgorithm.hpp"
 #include "Commodity.hpp"
 #include <iostream>
+#include <fstream>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/random.hpp>
 #include <boost/random.hpp>
@@ -89,30 +90,79 @@ Graph graph_test_init() {
     return g;
 }
 
-int main() 
-{
+void reset_flow_and_commodity(Graph& g, vector<Commodity> commodities) {
+    for (auto e : boost::make_iterator_range(boost::edges(g))) {
+        g[e].flow = 0;
+    }
+
+    for (Commodity c : commodities) {
+        c.demand = c.init_demand;
+        c.sent = 0;
+    }
+}
+
+void init_OMP_n_single_thread_with_large_data(Graph g, vector<Commodity> commodities, double alpha, double epsilon) {
+    //double avg_omp_rt = 0.0, avg_st_rt = 0.0;
+    double omp_ratio, ori_ratio;
+    double omp_rt = 0, ori_rt = 0;
+
+    //write into file
+    std::ofstream ompFile("..\\Python-TFS\\omp.txt");
+    std::ofstream stFile("..\\Python-TFS\\st.txt");
+
+    if (!ompFile && !stFile) {
+        std::cerr << "Error opening file!" << std::endl;
+        return;
+    }
+
+    omp_set_num_threads(8);
+    for (int i = 0; i < 2; i++) {
+        double omp_start = omp_get_wtime();
+        omp_ratio = OMP_flowDistributionAlgorithm(g, commodities, epsilon, alpha);
+        double omp_end = omp_get_wtime();
+        reset_flow_and_commodity(g, commodities);
+        omp_rt = omp_end - omp_start;
+
+        cout << omp_rt << endl;
+        ompFile << omp_rt << ", ";
+    }
+    //avg_omp_rt /= 3;
+
+    for (int i = 0; i < 2; i++) {
+        double ori_start = omp_get_wtime();
+        ori_ratio = flowDistributionAlgorithm(g, commodities, epsilon, alpha);
+        double ori_end = omp_get_wtime();
+        reset_flow_and_commodity(g, commodities);
+        ori_rt = ori_end - ori_start;
+
+        cout << ori_rt << endl;
+        stFile << ori_rt << ", ";
+    }
+    //avg_st_rt /= 3;
+
+    // Close the file
+    ompFile.close();
+    stFile.close();
+}
+
+int main() {
     try {
         //Graph
-        long long num_nodes = 10000; // adjust nodes
-        long long num_edges = 4000000; // desired number of edges
+        long long num_nodes = 250; // adjust nodes
+        long long num_edges = 625000; // desired number of edges
         Graph g = graph_test_init();    
         //Graph g = generate_random_graph(num_nodes, num_edges);
-        Graph g2 = g;
 
         //Commodity
-        int num_commodities = 6;  // number of commodities
+        int num_commodities = 20;  // number of commodities
         int min_demand = 10;      // minimum demand for a commodity
         int max_demand = 100;     // maximum demand for a commodity
 
-        graph_traits<Graph>::vertex_iterator vi, vi_end;
-        tie(vi, vi_end) = boost::vertices(g);
-
         //std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
 	    std::vector<Commodity> commodities = {
-		    {0, 3, 20},
+		    {0, 3, 12},
 		    {4, 5, 5},
 	    };
-        std::vector<Commodity> commodities2 = commodities;
 
         cout << "\n== Initial Commodities before Flow Distribution ==" << endl;
         for (const auto& commodity : commodities) {
@@ -121,32 +171,56 @@ int main()
                 << ", Demand = " << commodity.demand << endl;
         }
 
-
         omp_set_num_threads(8);
         double omp_start = omp_get_wtime();
-        double omp_ratio = OMP_flowDistributionAlgorithm(g2, commodities2, 0.01, 0.12);
+        double omp_ratio = OMP_flowDistributionAlgorithm(g, commodities, 0.01, 0.12);
         double omp_end = omp_get_wtime();
+
+        reset_flow_and_commodity(g, commodities);
 
         double ori_start = omp_get_wtime();
         double ori_ratio = flowDistributionAlgorithm(g, commodities, 0.01, 0.12);
         double ori_end = omp_get_wtime();
 
-
         double omp_runtime = omp_end - omp_start;
         double ori_runtime = ori_end - ori_start;
+
+        cout << "Max ratio (OMP): " << omp_ratio << endl;
+        cout << "Max ratio (Original): " << ori_ratio << endl;
+        cout << "Original Runtime: " << ori_runtime << endl;
+        cout << "OMP Runtime: " << omp_runtime << endl;
+
+        //write into file
+        std::ofstream mainFile("..\\Python-TFS\\omp_st.txt");
+        std::ofstream ompFile("..\\Python-TFS\\omp.txt", std::ios::app);
+        std::ofstream stFile("..\\Python-TFS\\st.txt", std::ios::app);
+
+        if (!mainFile && !ompFile && !stFile) {
+            std::cerr << "Error opening file!" << std::endl;
+            return -1;
+        }
+
+        // Write some text to the file
+        mainFile << "ST, " << ori_runtime << std::endl;
+        mainFile << "OMP, " << omp_runtime << std::endl;
+
+        ompFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << omp_runtime << ")" << endl;
+        stFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << ori_runtime << ")" << endl;
+
+        // Close the file
+        mainFile.close();
+        ompFile.close();
+        stFile.close();
 
         // print all commodities sent
         cout << "\n== Commodities after Flow Distribution ==" << endl;
         for (const auto& commodity : commodities) {
             cout << "Commodity: Source = " << commodity.source
-                << ", Destination = " << commodity.destination << ", Demand = " << commodity.init_demand
+                << ", Destination = " << commodity.destination 
+                << ", Demand = " << commodity.init_demand
                 << ", Sent = " << commodity.sent << endl;
         }
 
-	    cout << "Max ratio (OMP): " << omp_ratio << endl;
-	    cout << "Max ratio (Original): " << ori_ratio << endl;
-	    cout << "Original Runtime: " << ori_runtime << endl;
-        cout << "OMP Runtime: " << omp_runtime << endl;
     }
     catch (const std::invalid_argument& e) {
         std::cerr << "Error: " << e.what() << endl;

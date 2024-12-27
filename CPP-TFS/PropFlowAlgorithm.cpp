@@ -48,7 +48,7 @@ bool isFlowExceedingCapacity(Graph& g, vector<boost::graph_traits<Graph>::edge_d
 }
 
 void updateCommoditiesDemand(vector<Commodity>& commodities) {
-    for (auto c : commodities) {
+    for (auto& c : commodities) {
         c.demand = c.init_demand - c.sent;
     }
 }
@@ -82,18 +82,6 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
 
         vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = get_edges_with_flow(g);
 
-        for (auto e : edges_with_flow) {
-            auto source_node = boost::source(e, g);
-            auto target_node = boost::target(e, g);
-
-            auto flow = g[e].flow;
-            auto capacity = g[e].capacity;
-
-            if (g[e].flow > 0) {
-                std::cout << source_node << " -> " << target_node
-                    << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
-            }
-        }
 
         // calculate the bottleneck value
         double bottleneck_value = calculate_bottleneck(g, edges_with_flow);
@@ -105,6 +93,14 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
         }
 
         updateCommoditiesDemand(commodities);
+
+        for (auto e : edges_with_flow) {
+            auto source_node = boost::source(e, g);
+            auto target_node = boost::target(e, g);
+
+            auto flow = g[e].flow;
+            auto capacity = g[e].capacity;
+        }
 
         // recalculate weights
         recalculate_weights(g, alpha, edges_with_flow);
