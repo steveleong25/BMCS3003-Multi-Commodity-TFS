@@ -135,11 +135,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ProjectReference Include="..\CPP-TFS\CPP-TFS.vcxproj">
-      <Project>{9644348e-8e7c-41da-902c-47535e3c100a}</Project>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="Commodity.cpp" />
     <ClCompile Include="MPI_main.cpp" />
     <ClCompile Include="MPI_FlowAlgorithm.cpp" />
