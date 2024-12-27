@@ -137,7 +137,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Commodity.cpp" />
-    <ClCompile Include="CUDA-TFS.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="OMP_FlowAlgorithm.cpp" />
     <ClCompile Include="PathFinder.cpp" />
     <ClCompile Include="PropFlowAlgorithm.cpp" />

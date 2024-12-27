@@ -103,12 +103,12 @@ int main()
         Graph g3 = g;
 
         //Commodity
-        int num_commodities = 3;  // number of commodities
+        int num_commodities = 6;  // number of commodities
         int min_demand = 10;      // minimum demand for a commodity
         int max_demand = 100;     // maximum demand for a commodity
 
-        graph_traits<Graph>::vertex_iterator vi, vi_end;
-        tie(vi, vi_end) = boost::vertices(g);
+        //graph_traits<Graph>::vertex_iterator vi, vi_end;
+        //tie(vi, vi_end) = boost::vertices(g);
 
         std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
 	    /*std::vector<Commodity> commodities = {
