@@ -9,6 +9,8 @@ Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "Python-TFS", "..\Python-TFS
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MPI-TFS", "..\MPI-TFS\MPI-TFS.vcxproj", "{0F3CC7A0-99ED-4E54-A1BF-246FFE3B0668}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CUDA-TFS", "..\CUDA-TFS\CUDA-TFS\CUDA-TFS.vcxproj", "{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -49,6 +51,18 @@ Global
 		{0F3CC7A0-99ED-4E54-A1BF-246FFE3B0668}.Release|x64.Build.0 = Release|x64
 		{0F3CC7A0-99ED-4E54-A1BF-246FFE3B0668}.Release|x86.ActiveCfg = Release|Win32
 		{0F3CC7A0-99ED-4E54-A1BF-246FFE3B0668}.Release|x86.Build.0 = Release|Win32
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Debug|Any CPU.Build.0 = Debug|x64
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Debug|x64.ActiveCfg = Debug|x64
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Debug|x64.Build.0 = Debug|x64
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Debug|x86.ActiveCfg = Debug|Win32
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Debug|x86.Build.0 = Debug|Win32
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Release|Any CPU.ActiveCfg = Release|x64
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Release|Any CPU.Build.0 = Release|x64
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Release|x64.ActiveCfg = Release|x64
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Release|x64.Build.0 = Release|x64
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Release|x86.ActiveCfg = Release|Win32
+		{7CC6F7BE-15BC-497F-86F9-4BE99B424D74}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -151,7 +151,7 @@ void cuda_normalize_flows(std::vector<double>& flow, double bottleneck_value) {
     cudaMemcpy(d_flow, flow.data(), edge_count * sizeof(double), cudaMemcpyHostToDevice);
 
     // Configure the kernel
-    int threads_per_block = 256;
+    int threads_per_block = 1024;
     int blocks_per_grid = (edge_count + threads_per_block - 1) / threads_per_block;
 
     // Launch the kernel
@@ -175,7 +175,7 @@ void cuda_updateCommoditiesSent(std::vector<Commodity>& commodities, double bott
     cudaMemcpy(d_commodities, commodities.data(), num_commodities * sizeof(Commodity), cudaMemcpyHostToDevice);
 
     // Configure the kernel
-    int threads_per_block = 256;
+    int threads_per_block = 1024;
     int blocks_per_grid = (num_commodities + threads_per_block - 1) / threads_per_block;
 
     // Launch the kernel
@@ -205,7 +205,7 @@ void cuda_recalculate_weights(std::vector<double>& flow, std::vector<double>& ca
     cudaMemcpy(d_weights, weights.data(), edge_count * sizeof(double), cudaMemcpyHostToDevice);
 
     // Configure the kernel
-    int threads_per_block = 256;
+    int threads_per_block = 1024;
     int blocks_per_grid = (edge_count + threads_per_block - 1) / threads_per_block;
 
     // Launch the kernel
@@ -241,7 +241,7 @@ bool cuda_isFlowExceedingCapacity(const std::vector<double>& flow, const std::ve
     cudaMemcpy(d_result, &initial_result, sizeof(bool), cudaMemcpyHostToDevice);
 
     // Configure the kernel
-    int threads_per_block = 256;
+    int threads_per_block = 1024;
     int blocks_per_grid = (edge_count + threads_per_block - 1) / threads_per_block;
 
     // Launch the kernel
