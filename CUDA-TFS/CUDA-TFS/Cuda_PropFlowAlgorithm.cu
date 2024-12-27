@@ -1,3 +1,6 @@
+//// Cuda_PropFlowAlgorithm.cu
+
+
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "Commodity.hpp"
@@ -11,6 +14,18 @@ using namespace std;
 
 
 ///////////////////////////// CUDA IMPLEMENTATION //////////////////////////////////////
+__device__ double atomicMinDouble(double* address, double val) {
+    unsigned long long int* address_as_ull = (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+            __double_as_longlong(fmin(__longlong_as_double(assumed), val)));
+    } while (assumed != old);
+
+    return __longlong_as_double(old);
+}
 
 __global__ void calculate_bottleneck_kernel(double* flow, double* capacity, double* min_ratio, int edge_count) {
     extern __shared__ double shared_min[];  // Shared memory for block-level reduction
@@ -19,7 +34,7 @@ __global__ void calculate_bottleneck_kernel(double* flow, double* capacity, doub
     int thread_idx = threadIdx.x;
 
     // Initialize the local minimum to a high value
-    double local_min = std::numeric_limits<double>::max();
+    double local_min = DBL_MAX;
 
     // Each thread processes one edge
     if (idx < edge_count && flow[idx] > 0) {
@@ -41,7 +56,7 @@ __global__ void calculate_bottleneck_kernel(double* flow, double* capacity, doub
 
     // Store the block's minimum value in the global output
     if (thread_idx == 0) {
-        atomicMin(min_ratio, shared_min[0]);
+        atomicMinDouble(min_ratio, shared_min[0]);
     }
 }
 
@@ -244,138 +259,114 @@ bool cuda_isFlowExceedingCapacity(const std::vector<double>& flow, const std::ve
     return result;
 }
 
-std::vector<int> cuda_getEdgesWithFlow(const std::vector<double>& flow) {
-    int edge_count = flow.size();
-
-    // Device pointers
-    double* d_flow;
-    int* d_result_indices;
-    int* d_result_count;
-
-    // Allocate device memory
-    cudaMalloc(&d_flow, edge_count * sizeof(double));
-    cudaMalloc(&d_result_indices, edge_count * sizeof(int)); // Maximum possible size
-    cudaMalloc(&d_result_count, sizeof(int));
-
-    // Copy data to device
-    cudaMemcpy(d_flow, flow.data(), edge_count * sizeof(double), cudaMemcpyHostToDevice);
-    int initial_count = 0;
-    cudaMemcpy(d_result_count, &initial_count, sizeof(int), cudaMemcpyHostToDevice);
-
-    // Configure the kernel
-    int threads_per_block = 256;
-    int blocks_per_grid = (edge_count + threads_per_block - 1) / threads_per_block;
-
-    // Launch the kernel
-    getEdgesWithFlowKernel << <blocks_per_grid, threads_per_block >> > (d_flow, d_result_indices, d_result_count, edge_count);
-
-    // Retrieve the result count
-    int result_count;
-    cudaMemcpy(&result_count, d_result_count, sizeof(int), cudaMemcpyDeviceToHost);
-
-    // Retrieve the result indices
-    std::vector<int> result_indices(result_count);
-    cudaMemcpy(result_indices.data(), d_result_indices, result_count * sizeof(int), cudaMemcpyDeviceToHost);
-
-    // Free device memory
-    cudaFree(d_flow);
-    cudaFree(d_result_indices);
-    cudaFree(d_result_count);
-
-    return result_indices;
+void extractFlowCapacityWeights(Graph& g,
+    const std::vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow,
+    std::vector<double>& flow,
+    std::vector<double>& capacity,
+    std::vector<double>& weights) {
+    flow.clear();
+    capacity.clear();
+    weights.clear();
+    for (auto& e : edges_with_flow) {
+        flow.push_back(g[e].flow);
+        capacity.push_back(g[e].capacity);
+        weights.push_back(g[e].weight);
+    }
 }
 
+vector<boost::graph_traits<Graph>::edge_descriptor> cuda_get_edges_with_flow(Graph& g) {
+    vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow;
+
+    for (auto e : boost::make_iterator_range(boost::edges(g))) {
+        if (g[e].flow > 0) {
+            edges_with_flow.push_back(e);
+        }
+    }
+
+    return edges_with_flow;
+}
 
 double CUDA_flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodities, double epsilon, double alpha) {
-    // Step 1: Normalize Flows
-    {
-        std::cout << "=== Normalizing Flows ===" << std::endl;
-        std::vector<double> flow = { 10.0, 20.0, 30.0 }; // Example flow values
-        double bottleneck_value = 0.5;                 // Example bottleneck value
+    double solution = 0.0;
 
-        // Normalize flows using CUDA
-        cuda_normalize_flows(flow, bottleneck_value);
+    // Step 1: Find shortest path for each commodity and distribute initial flow
+    for (auto& commodity : commodities) {
+        std::vector<int> path = find_shortest_path(g, commodity.source, commodity.destination);
 
-        // Print the updated flows
-        for (double f : flow) {
-            std::cout << "Normalized flow: " << f << std::endl;
+        for (size_t i = 1; i < path.size(); ++i) {
+            auto e = boost::edge(path[i - 1], path[i], g).first;
+            g[e].flow += commodity.demand;
+            commodity.sent = g[e].flow;
         }
     }
 
-    // Step 2: Update Commodities Sent
-    {
-        std::cout << "=== Updating Commodities Sent ===" << std::endl;
-        //std::vector<Commodity> commodities = {
-        //    {0, 1, 100.0, 50.0},
-        //    {1, 2, 200.0, 100.0},
-        //    {2, 3, 300.0, 150.0}
-        //};
-        double bottleneck_value = 0.5; // Example bottleneck value
+    vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = cuda_get_edges_with_flow(g);
 
-        // Update commodities sent values using CUDA
-        cuda_updateCommoditiesSent(commodities, bottleneck_value);
+    std::vector<double> flow, capacity, weights;
+    extractFlowCapacityWeights(g, edges_with_flow, flow, capacity, weights);
 
-        // Print the updated commodities
-        for (const auto& commodity : commodities) {
-            std::cout << "Commodity sent: " << commodity.sent << std::endl;
+    double prev_max_ratio = 0.0;
+    while (true) {
+        // Step 2: Calculate the bottleneck value using CUDA
+        double bottleneck_value = cuda_calculate_bottleneck(flow, capacity, flow.size());
+
+        // Step 3: Normalize flows if they exceed capacity
+        if (cuda_isFlowExceedingCapacity(flow, capacity)) {
+            cuda_normalize_flows(flow, bottleneck_value);
+            cuda_updateCommoditiesSent(commodities, bottleneck_value);
+
+            // Update the graph's flow values
+            for (size_t i = 0; i < edges_with_flow.size(); ++i) {
+                g[edges_with_flow[i]].flow = flow[i];
+            }
         }
-    }
 
-    // Step 3: Recalculate Weights
-    {
-        std::cout << "=== Recalculating Weights ===" << std::endl;
-        std::vector<double> flow = { 10.0, 20.0, 30.0 };      // Example flow values
-        std::vector<double> capacity = { 50.0, 40.0, 60.0 };  // Example capacity values
-        std::vector<double> weights = { 1.0, 1.0, 1.0 };      // Initial weights
-        double alpha = 0.1;                                 // Example alpha value
+        // Step 4: Print edges with flow details (Optional for debugging)
+        for (size_t i = 0; i < edges_with_flow.size(); ++i) {
+            auto source_node = boost::source(edges_with_flow[i], g);
+            auto target_node = boost::target(edges_with_flow[i], g);
 
-        // Recalculate weights using CUDA
+            std::cout << source_node << " -> " << target_node
+                << " [Flow: " << static_cast<int>(flow[i]) // Convert flow to integer
+                << ", Capacity: " << capacity[i] << "]\n";
+        }
+
+        // Step 5: Recalculate weights using CUDA
         cuda_recalculate_weights(flow, capacity, weights, alpha);
 
-        // Print the updated weights
-        for (double weight : weights) {
-            std::cout << "Weight: " << weight << std::endl;
+        // Update the graph's weight values
+        for (size_t i = 0; i < edges_with_flow.size(); ++i) {
+            g[edges_with_flow[i]].weight = weights[i];
         }
+
+        // Step 6: Compute the maximum ratio after redistribution
+        double max_ratio = 0.0;
+        double highest_flow = 0.0, min_capacity = 0.0;
+
+        for (size_t i = 0; i < edges_with_flow.size(); ++i) {
+            double total_flow_on_edge = flow[i];
+            double edge_capacity = capacity[i];
+
+            if (total_flow_on_edge > highest_flow) {
+                highest_flow = total_flow_on_edge;
+                min_capacity = edge_capacity;
+                max_ratio = edge_capacity / total_flow_on_edge;
+            }
+            else if (total_flow_on_edge == highest_flow) {
+                if (edge_capacity < min_capacity) {
+                    min_capacity = edge_capacity;
+                    max_ratio = edge_capacity / total_flow_on_edge;
+                }
+            }
+        }
+
+        // Step 7: Check for convergence
+        if (std::abs(max_ratio - prev_max_ratio) < epsilon) {
+            solution = max_ratio;
+            break;
+        }
+        prev_max_ratio = max_ratio;
     }
 
-    // Step 4: Check Flow Exceeding Capacity
-    {
-        std::cout << "=== Checking Flow Exceeding Capacity ===" << std::endl;
-        std::vector<double> flow = { 10.0, 20.0, 30.0 };      // Example flow values
-        std::vector<double> capacity = { 50.0, 15.0, 60.0 }; // Example capacity values
-
-        // Check if any flow exceeds capacity
-        int exceedsCapacity = cuda_isFlowExceedingCapacity(flow, capacity);
-
-        if (exceedsCapacity) {
-            std::cout << "At least one edge's flow exceeds its capacity!" << std::endl;
-        }
-        else {
-            std::cout << "All edges are within capacity limits." << std::endl;
-        }
-    }
-
-    // Step 5: Get Edges with Flow > 0
-    {
-        std::cout << "=== Getting Edges with Flow > 0 ===" << std::endl;
-        // Example graph and flow
-        std::vector<double> flow; // Populate with flow values for edges
-
-        // Get edges with flow > 0 using CUDA
-        std::vector<int> edge_indices_with_flow = cuda_getEdgesWithFlow(flow);
-
-        // Map indices back to edge descriptors
-        std::vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow;
-        auto edges = boost::edges(g);
-        for (int idx : edge_indices_with_flow) {
-            edges_with_flow.push_back(*(edges.first + idx)); // Retrieve edge descriptor
-        }
-
-        // Print edges with flow
-        for (auto e : edges_with_flow) {
-            std::cout << "Edge with flow: " << boost::source(e, g) << " -> " << boost::target(e, g) << std::endl;
-        }
-    }
-
-    return 0;
+    return solution;
 }
