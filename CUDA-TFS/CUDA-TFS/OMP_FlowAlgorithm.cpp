@@ -134,10 +134,8 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
             }
         }
 
-        // recalculate weights
         parallel_recalculate_weights(g, alpha, edges_with_flow);
 
-        // compute the max ratio after redistribution       
         double max_ratio = 0.0;
         double highest_flow = 0.0;
         double min_capacity = std::numeric_limits<double>::max(); 
@@ -156,13 +154,11 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
                 double total_flow_on_edge = g[e].flow;
                 double edge_capacity = g[e].capacity;
 
-                // if current edge flow is greater than the current highest flow in this thread
                 if (total_flow_on_edge > local_highest_flow) {
                     local_highest_flow = total_flow_on_edge;
                     local_min_capacity = edge_capacity;  // reassign min capacity
                     local_max_ratio = edge_capacity / total_flow_on_edge;
                 }
-                // if current edge flow is equal to the current highest flow, update by min_capacity
                 else if (total_flow_on_edge == local_highest_flow) {
                     if (edge_capacity < local_min_capacity) {
                         local_min_capacity = edge_capacity;  
@@ -171,7 +167,6 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
                 }
             }
 
-            // update global max_ratio, highest_flow, and min_capacity
             #pragma omp critical
             {
                 if (local_highest_flow > highest_flow) {
@@ -188,7 +183,6 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
             }
         }
 
-        // convergence
         if (abs(max_ratio - prev_max_ratio) < epsilon) {
             solution = max_ratio;
             break;

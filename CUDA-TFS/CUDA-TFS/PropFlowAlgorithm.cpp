@@ -34,7 +34,7 @@ void updateCommoditiesSent(vector<Commodity>& commodities, double bottleneck_val
 void recalculate_weights(Graph& g, double alpha, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
     for (auto e : edges_with_flow) {
         double flow_ratio = g[e].flow / g[e].capacity;
-        g[e].weight = std::exp(alpha * flow_ratio); // exponential weight
+        g[e].weight = std::exp(alpha * flow_ratio); 
     }
 }
 
@@ -98,10 +98,8 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
             }
         }
 
-        // recalculate weights
         recalculate_weights(g, alpha, edges_with_flow);
 
-        // compute the maximum ratio after redistribution
         double max_ratio = 0.0;
         double highest_flow = 0.0, min_capacity = 0.0;
         boost::graph_traits<Graph>::edge_iterator ei, ei_end;
@@ -123,7 +121,6 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
             }
         }
 
-        // convergence
         if (std::abs(max_ratio - prev_max_ratio) < epsilon) {
             solution = max_ratio;
             break;

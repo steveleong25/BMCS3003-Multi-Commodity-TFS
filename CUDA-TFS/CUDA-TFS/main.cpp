@@ -5,7 +5,7 @@
 #include "Commodity.hpp"
 #include "Cuda_PropFlowAlgorithm.cuh"
 #include <iostream>
-#include <fstream>            // <-- For file output
+#include <fstream>          
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/random.hpp>
 #include <boost/random.hpp>
@@ -14,7 +14,6 @@
 using namespace std;
 using namespace boost;
 
-// Define the graph type
 Graph generate_random_graph(long long num_nodes, long long num_edges) {
     if (num_nodes <= 1) {
         throw std::invalid_argument("Number of nodes must be greater than 1.");
@@ -92,32 +91,22 @@ Graph graph_test_init() {
 int main()
 {
     try {
-        // 1) GRAPH GENERATION
-        long long num_nodes = 10000;    // adjust nodes
+        long long num_nodes = 100000;    // adjust nodes
         long long num_edges = 4000000;  // desired number of edges
 
-        // You can comment/uncomment to test a small or large graph:
-        // Graph g = graph_test_init(); // small, test version
         Graph g = generate_random_graph(num_nodes, num_edges);
         Graph g2 = g; // For OMP
         Graph g3 = g; // For CUDA
 
-        // 2) COMMODITY GENERATION
         int num_commodities = 6;  // number of commodities
         int min_demand = 10;      // minimum demand for a commodity
         int max_demand = 100;     // maximum demand for a commodity
 
         std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
 
-        // For a quick test, you could define manual commodities:
-        /*
-        std::vector<Commodity> commodities = {
-            {0, 3, 20},
-            {4, 5, 5},
-        };
-        */
 
-        // 3) PRINT INITIAL COMMODITIES
+
+
         cout << "\n== Initial Commodities before Flow Distribution ==" << endl;
         for (const auto& commodity : commodities) {
             cout << "Commodity: Source = " << commodity.source
@@ -143,7 +132,7 @@ int main()
 
         cout << "=========================================" << endl;
 
-        // 6) CUDA
+
         double cuda_start = omp_get_wtime();
         double cuda_ratio = CUDA_flowDistributionAlgorithm(g3, commodities, 0.01, 0.12);
         double cuda_end = omp_get_wtime();
@@ -151,7 +140,7 @@ int main()
 
         cout << "=========================================" << endl;
 
-        // 7) PRINT COMMODITIES AFTER FLOW DISTRIBUTION
+
         cout << "\n== Commodities after Flow Distribution ==" << endl;
         for (const auto& commodity : commodities) {
             cout << "Commodity: Source = " << commodity.source
@@ -160,7 +149,7 @@ int main()
                 << ", Sent = " << commodity.sent << endl;
         }
 
-        // 8) PRINT RATIO AND RUNTIME SUMMARY
+
         cout << "Max ratio (Original): " << ori_ratio << endl;
         cout << "Max ratio (OMP):      " << omp_ratio << endl;
         cout << "Max ratio (CUDA):    " << cuda_ratio << endl;
@@ -168,22 +157,13 @@ int main()
         cout << "OMP Runtime:         " << omp_runtime << endl;
         cout << "CUDA Runtime:        " << cuda_runtime << endl;
 
-        // 9) WRITE RUNTIMES TO FILES (SIMILAR TO SINGLE-THREADED & OMP VERSION)
-        // ---------------------------------------------------------------------
-        // These files are used in your Python TFS or data analysis scripts.
-        // Adjust the file paths as needed. 
-        // ---------------------------------------------------------------------
 
-        // a) mainFile: summarizing all in one file
+
         std::ofstream mainFile("..\\..\\Python-TFS\\cuda_omp_st.txt");
-        // b) stFile: single-threaded data (append)
         std::ofstream stFile("..\\..\\Python-TFS\\st.txt", std::ios::app);
-        // c) ompFile: openMP data (append)
         std::ofstream ompFile("..\\..\\Python-TFS\\omp.txt", std::ios::app);
-        // d) cudaFile: cuda data (append)
         std::ofstream cudaFile("..\\..\\Python-TFS\\cuda.txt", std::ios::app);
 
-        // Check if files are open
         if (!mainFile) {
             cerr << "Error opening mainFile: " << endl;
             return -1;
@@ -201,12 +181,10 @@ int main()
             return -1;
         }
 
-        // Write data to the main file
         mainFile << "ST, " << ori_runtime << std::endl;
         mainFile << "OMP, " << omp_runtime << std::endl;
         mainFile << "CUDA, " << cuda_runtime << std::endl;
 
-        // Write data to individual files
         stFile << "(" << boost::num_vertices(g) << ", "
        << commodities.size() << ", "
             << ori_runtime << ")"
