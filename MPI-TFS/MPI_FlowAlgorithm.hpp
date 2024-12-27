@@ -15,7 +15,7 @@ void updateCommoditiesSent(std::vector<Commodity>& commodities, double bottlenec
 
 void recalculate_weights(Graph& g, double alpha, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow);
 
-double MPI_flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodities, double epsilon, double alpha);
+double MPI_flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodities, double epsilon, double alpha, int rank, int size);
 
 vector<boost::graph_traits<Graph>::edge_descriptor> get_edges_with_flow(Graph& g);
 

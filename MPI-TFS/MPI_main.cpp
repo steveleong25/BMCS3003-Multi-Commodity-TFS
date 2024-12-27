@@ -68,11 +68,11 @@ Graph graph_test_init() {
     };
 
     std::vector<EdgeProperties> edge_properties = {
-        {10, 10}, {10, 10}, //  0 <-> 1
-        {12, 20}, {12, 20}, //  1 <-> 2
-        {8, 15}, {8, 15},   //  2 <-> 3
-        {10, 40}, {10, 40}, //  2 <-> 5
-        {15, 30}, {15, 30}  //  4 <-> 1
+        {10, 10, 0}, {10, 10, 0}, //  0 <-> 1
+        {12, 20, 0}, {12, 20, 0}, //  1 <-> 2
+        {8, 15, 0}, {8, 15, 0},   //  2 <-> 3
+        {10, 40, 0}, {10, 40, 0}, //  2 <-> 5
+        {15, 30, 0}, {15, 30, 0}  //  4 <-> 1
     };
 
     Graph g;
@@ -97,12 +97,36 @@ int main(int argc, char* argv[]) {
 
     Graph g;
     vector<Commodity> commodities;
-    double epsilon = 1e-5;
+    double epsilon = 0.01;
     double alpha = 0.1;
 
     // Initialize graph and commodities (only on rank 0)
     if (rank == 0) {
-        // Load graph and commodities
+        try {
+            //Graph
+            long long num_nodes = 10000; // adjust nodes
+            long long num_edges = 4000000; // desired number of edges
+            g = graph_test_init();    
+            //g = generate_random_graph(num_nodes, num_edges);
+            Graph g2 = g;
+
+            //Commodity
+            //int num_commodities = 6;  // number of commodities
+            //int min_demand = 10;      // minimum demand for a commodity
+            //int max_demand = 100;     // maximum demand for a commodity
+
+            graph_traits<Graph>::vertex_iterator vi, vi_end;
+            tie(vi, vi_end) = boost::vertices(g);
+
+            //std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
+            std::vector<Commodity> commodities = {
+                {0, 3, 20},
+                {4, 5, 5},
+            };
+        }
+        catch (const std::invalid_argument& e) {
+            std::cerr << "Error: " << e.what() << endl;
+        }
     }
 
     // Call parallelized algorithm

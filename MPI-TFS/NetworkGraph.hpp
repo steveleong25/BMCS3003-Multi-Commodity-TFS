@@ -22,7 +22,9 @@ typedef boost::adjacency_list<
     boost::vecS,             // Storage for edges (using vector)
     boost::directedS,        // Directed graph
     boost::no_property,      // Vertex properties (no extra properties here)
-    boost::property<boost::edge_weight_t, int, EdgeProperties>  // Edge properties (weight and flow)
+    boost::property<boost::edge_weight_t, int,
+    property<edge_capacity_t, int,
+    property<edge_flow_t, int>>>    // Edge properties (weight, capacity, flow)
 > Graph;
 
 #endif

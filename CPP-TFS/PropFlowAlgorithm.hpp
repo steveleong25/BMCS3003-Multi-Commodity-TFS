@@ -13,6 +13,8 @@ void normalize_flows(Graph& g, double bottleneck_value, vector<boost::graph_trai
 
 void updateCommoditiesSent(std::vector<Commodity>& commodities, double bottleneck_value);
 
+void updateCommoditiesDemand(std::vector<Commodity>& commodities);
+
 void recalculate_weights(Graph& g, double alpha, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow);
 
 double flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodities, double epsilon, double alpha);

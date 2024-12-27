@@ -3,9 +3,12 @@
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "Commodity.hpp"
+#include "PropFlowAlgorithm.hpp"
+#include <cmath>
 #include <omp.h>
 
 using namespace std;
+const int INITIAL_WEIGHT = 5;
 
 double parallel_calculate_bottleneck(Graph& g, vector<boost::graph_traits<Graph>::edge_descriptor>& edges_with_flow) {
     double min_ratio = std::numeric_limits<double>::max();
@@ -55,8 +58,7 @@ void parallel_recalculate_weights(Graph& g, double alpha, vector<boost::graph_tr
     #pragma omp parallel for
     for (i = 0; i < edges_with_flow.size(); i++) {
         auto e = edges_with_flow[i]; 
-        double flow_ratio = g[e].flow / g[e].capacity;
-        g[e].weight = exp(alpha * flow_ratio); // exponential weight 
+        g[e].weight = std::min(INITIAL_WEIGHT * (int)ceil(std::exp(alpha * g[e].flow)), INT_MAX);
     }
 }
 
@@ -92,26 +94,35 @@ vector<boost::graph_traits<Graph>::edge_descriptor> OMP_get_edges_with_flow(Grap
 }
 
 double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, double epsilon, double alpha) {
+
+    cout << "Parallel" << endl;
     double solution = 0.0;
-
     int i;
-    #pragma omp parallel for schedule(dynamic, 64)
-    for (i = 0; i < commodities.size(); i++) {
-        std::vector<int> path = find_shortest_path(g, commodities[i].source, commodities[i].destination);
-        if (path.empty()) continue;
-
-        for (int j = 1; j < path.size(); ++j) {
-            auto e = boost::edge(path[j - 1], path[j], g).first;
-            #pragma omp atomic
-            g[e].flow += commodities[i].demand;
-            commodities[i].sent = g[e].flow;
-        }
-    }    
-
-    vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = OMP_get_edges_with_flow(g);
-
     double prev_max_ratio = 0.0;
+
     while (true) {
+        #pragma omp parallel for
+        for (i = 0; i < commodities.size(); i++) {
+            std::vector<int> path = find_shortest_path(g, commodities[i].source, commodities[i].destination);
+            if (path.empty()) continue;
+
+            for (int j = 1; j < path.size(); ++j) {
+                auto e = boost::edge(path[j - 1], path[j], g).first;
+                #pragma omp critical
+                {
+                    cout << commodities[i].demand;
+                    g[e].flow += commodities[i].demand;
+                }
+                
+
+                commodities[i].sent = g[e].flow;
+                std::cout << "Assigned flow to edge (" << path[j - 1] << ", " << path[j]
+                    << ") with flow = " << g[e].flow << std::endl;
+            }
+        }    
+
+        vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = OMP_get_edges_with_flow(g);
+
         // get bottleneck value
         double bottleneck_value = parallel_calculate_bottleneck(g, edges_with_flow);
 
@@ -120,6 +131,7 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
             parallel_normalize_flows(g, bottleneck_value, edges_with_flow);
             parallel_updateCommoditiesSent(commodities, bottleneck_value);
         }
+        updateCommoditiesDemand(commodities);
 
         for (auto e : edges_with_flow) {
             auto source_node = boost::source(e, g);
@@ -151,7 +163,6 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
             #pragma omp for
             for (i = 0; i < edges_with_flow.size(); ++i) {
                 auto e = edges_with_flow[i];
-                if (g[e].flow == 0) continue;  // skip edges with no flow
 
                 double total_flow_on_edge = g[e].flow;
                 double edge_capacity = g[e].capacity;

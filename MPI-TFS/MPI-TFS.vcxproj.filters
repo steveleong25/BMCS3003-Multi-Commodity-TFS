@@ -18,30 +18,27 @@
     <ClCompile Include="MPI_main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="MPI_PropFlowAlgorithm.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="NetworkGraph.cpp">
+    <ClCompile Include="MPI_FlowAlgorithm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PathFinder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PropFlowAlgorithm.cpp">
+    <ClCompile Include="Commodity.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MPI_PropFlowAlgorithm.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="NetworkGraph.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PathFinder.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="PropFlowAlgorithm.hpp">
+    <ClInclude Include="Commodity.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MPI_FlowAlgorithm.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

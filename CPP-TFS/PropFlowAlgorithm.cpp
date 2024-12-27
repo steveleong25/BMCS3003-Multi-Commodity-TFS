@@ -1,10 +1,12 @@
 #include <iostream>
 #include <vector>
+#include <cmath>
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "Commodity.hpp"
 
 using namespace std;
+const int INITIAL_WEIGHT = 5;
 
 double calculate_bottleneck(Graph& g, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
     double min_ratio = std::numeric_limits<double>::max();
@@ -31,10 +33,15 @@ void updateCommoditiesSent(vector<Commodity>& commodities, double bottleneck_val
 	}
 }
 
+void updateCommoditiesDemand(vector<Commodity>& commodities) {
+    for (auto& commodity : commodities) {
+        commodity.demand = commodity.init_demand - commodity.sent;
+    }
+}
+
 void recalculate_weights(Graph& g, double alpha, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
     for (auto e : edges_with_flow) {
-        double flow_ratio = g[e].flow / g[e].capacity;
-        g[e].weight = std::exp(alpha * flow_ratio); // exponential weight
+        g[e].weight = std::min(INITIAL_WEIGHT * (int)ceil(std::exp(alpha * g[e].flow)), INT_MAX);
     }
 }
 
@@ -62,20 +69,22 @@ vector<boost::graph_traits<Graph>::edge_descriptor> get_edges_with_flow(Graph& g
 double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, double epsilon, double alpha) {
     double solution = 0.0;
 
-    for (auto& commodity : commodities) {
-        std::vector<int> path = find_shortest_path(g, commodity.source, commodity.destination);
-
-        for (size_t i = 1; i < path.size(); ++i) {
-            auto e = boost::edge(path[i - 1], path[i], g).first;
-            g[e].flow += commodity.demand;
-			commodity.sent = g[e].flow;
-        }
-    }
-
-    vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = get_edges_with_flow(g);
-
     double prev_max_ratio = 0.0;
     while (true) {
+        for (auto& commodity : commodities) {
+            std::vector<int> path = find_shortest_path(g, commodity.source, commodity.destination);
+
+            for (size_t i = 1; i < path.size(); ++i) {
+                auto e = boost::edge(path[i - 1], path[i], g).first;
+                g[e].flow += commodity.demand;
+                commodity.sent = commodity.demand;
+
+                std::cout << "Assigned flow to edge (" << path[i - 1] << ", " << path[i]
+                    << ") with flow = " << g[e].flow << std::endl;
+            }
+        }
+
+        vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = get_edges_with_flow(g);
         // calculate the bottleneck value
         double bottleneck_value = calculate_bottleneck(g, edges_with_flow);
 
@@ -85,6 +94,7 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
 		    updateCommoditiesSent(commodities, bottleneck_value);
 		}
 
+        updateCommoditiesDemand(commodities);
         for (auto e : edges_with_flow) {
             auto source_node = boost::source(e, g);
             auto target_node = boost::target(e, g);
