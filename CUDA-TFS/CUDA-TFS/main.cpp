@@ -91,16 +91,27 @@ Graph graph_test_init() {
 int main()
 {
     try {
-        long long num_nodes = 100000;    // adjust nodes
-        long long num_edges = 4000000;  // desired number of edges
+        long long num_nodes;    // adjust nodes
+        long long num_edges;  // desired number of edges
 
         Graph g = generate_random_graph(num_nodes, num_edges);
         Graph g2 = g; // For OMP
         Graph g3 = g; // For CUDA
 
-        int num_commodities = 6;  // number of commodities
-        int min_demand = 10;      // minimum demand for a commodity
-        int max_demand = 100;     // maximum demand for a commodity
+        int num_commodities;  // number of commodities
+        int min_demand;      // minimum demand for a commodity
+        int max_demand;     // maximum demand for a commodity
+
+        cout << "Enter the number of nodes: ";
+	    cin << num_nodes;
+	    cout << "Enter the number of edges: ";
+	    cin << num_edges;
+	    cout << "Enter the number of commodities: ";
+	    cin << num_commodities;
+	    cout << "Enter the minimum demand for each commodities: ";
+	    cin << min_demand;
+    	cout << "Enter the maximum demand for each commodities: ";
+	    cin << max_demand;
 
         std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
 
