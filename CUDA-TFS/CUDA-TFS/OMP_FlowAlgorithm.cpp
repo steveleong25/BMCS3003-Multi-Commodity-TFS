@@ -44,7 +44,7 @@ void parallel_normalize_flows(Graph& g, double bottleneck_value, vector<boost::g
 
 void parallel_updateCommoditiesSent(vector<Commodity>& commodities, double bottleneck_value) {
     int i;
-    #pragma omp parallel for schedule(dynamic, 64)
+    #pragma omp parallel for
     for (i = 0; i < commodities.size(); i++) {
         commodities[i].sent *= bottleneck_value;
     }
@@ -95,7 +95,7 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
     double solution = 0.0;
 
     int i;
-    #pragma omp parallel for schedule(dynamic, 64)
+    #pragma omp parallel for
     for (i = 0; i < commodities.size(); i++) {
         std::vector<int> path = find_shortest_path(g, commodities[i].source, commodities[i].destination);
         if (path.empty()) continue;
