@@ -34,7 +34,7 @@ void updateCommoditiesSent(vector<Commodity>& commodities, double bottleneck_val
 void recalculate_weights(Graph& g, double alpha, vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow) {
     for (auto e : edges_with_flow) {
         double flow_ratio = g[e].flow / g[e].capacity;
-        g[e].weight = std::exp(alpha * flow_ratio); 
+        g[e].weight = g[e].weight * std::exp(alpha * flow_ratio); 
     }
 }
 
