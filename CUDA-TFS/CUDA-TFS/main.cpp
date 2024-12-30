@@ -103,15 +103,15 @@ int main()
         int max_demand;     // maximum demand for a commodity
 
         cout << "Enter the number of nodes: ";
-	    cin << num_nodes;
+	    cin >> num_nodes;
 	    cout << "Enter the number of edges: ";
-	    cin << num_edges;
+	    cin >> num_edges;
 	    cout << "Enter the number of commodities: ";
-	    cin << num_commodities;
+	    cin >> num_commodities;
 	    cout << "Enter the minimum demand for each commodities: ";
-	    cin << min_demand;
+	    cin >> min_demand;
     	cout << "Enter the maximum demand for each commodities: ";
-	    cin << max_demand;
+	    cin >> max_demand;
 
         std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
 
