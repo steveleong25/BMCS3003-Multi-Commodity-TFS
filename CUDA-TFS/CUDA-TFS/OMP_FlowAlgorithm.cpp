@@ -56,7 +56,7 @@ void parallel_recalculate_weights(Graph& g, double alpha, vector<boost::graph_tr
     for (i = 0; i < edges_with_flow.size(); i++) {
         auto e = edges_with_flow[i]; 
         double flow_ratio = g[e].flow / g[e].capacity;
-        g[e].weight = exp(alpha * flow_ratio); // exponential weight 
+        g[e].weight *= exp(alpha * flow_ratio); // exponential weight 
     }
 }
 
