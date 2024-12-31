@@ -69,10 +69,21 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
     double solution = 0.0;
 
     double prev_max_ratio = 0.0;
+
+    std::vector<std::vector<std::vector<int>>> all_shortest_paths = find_all_shortest_paths(g);
+
     while (true) {
         for (auto& commodity : commodities) {
-            std::vector<int> path = find_shortest_path(g, commodity.source, commodity.destination);
+            // Retrieve the shortest path for this source-destination pair
+            const std::vector<int>& path = all_shortest_paths[commodity.source][commodity.destination];
 
+            if (path.empty()) {
+                std::cerr << "No path exists between source " << commodity.source
+                    << " and destination " << commodity.destination << std::endl;
+                continue;
+            }
+
+            // Use the path to distribute flows
             for (size_t i = 1; i < path.size(); ++i) {
                 auto e = boost::edge(path[i - 1], path[i], g).first;
                 g[e].flow += commodity.demand;
@@ -81,7 +92,6 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
         }
 
         vector<boost::graph_traits<Graph>::edge_descriptor> edges_with_flow = get_edges_with_flow(g);
-
 
         // calculate the bottleneck value
         double bottleneck_value = calculate_bottleneck(g, edges_with_flow);
@@ -104,6 +114,7 @@ double flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, doubl
 
         // recalculate weights
         recalculate_weights(g, alpha, edges_with_flow);
+        all_shortest_paths.clear();
 
         // compute the maximum ratio after redistribution
         double max_ratio = 0.0;

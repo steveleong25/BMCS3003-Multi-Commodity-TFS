@@ -9,35 +9,57 @@ const int INF = std::numeric_limits<int>::max();
 
 using namespace std;
 
+typedef graph_traits<Graph>::vertex_descriptor Vertex;
+typedef std::pair<int, int> Edge;
 
-std::vector<int> find_shortest_path(const Graph& g, int source, int destination) {
-    if (source < 0 || source >= boost::num_vertices(g) ||
-        destination < 0 || destination >= boost::num_vertices(g)) {
-        std::cerr << "Invalid source or destination vertex." << std::endl;
-        return {}; // return empty vector for invalid input
-    }
-
-    std::vector<int> distances(boost::num_vertices(g));
-    std::vector<boost::graph_traits<Graph>::vertex_descriptor> predecessors(boost::num_vertices(g));
-
-    boost::dijkstra_shortest_paths(g, source,
-        boost::distance_map(boost::make_iterator_property_map(distances.begin(), boost::get(boost::vertex_index, g))).
-        predecessor_map(boost::make_iterator_property_map(predecessors.begin(), boost::get(boost::vertex_index, g))).
-        weight_map(boost::get(&EdgeProperties::weight, g)));
-
-    if (distances[destination] == std::numeric_limits<int>::max()) {
-        std::cout << "No path exists.\n";
-        return {}; // return empty vector if no path exists
-    }
-
+// Function to reconstruct a single path using the predecessor map
+std::vector<int> reconstruct_path(Vertex source, Vertex target, const std::vector<Vertex>& predecessors) {
     std::vector<int> path;
-    boost::graph_traits<Graph>::vertex_descriptor current = destination;
+    Vertex current = target;
+
+    // Trace back the path using the predecessor map
     while (current != source) {
         path.push_back(current);
         current = predecessors[current];
     }
-    path.push_back(source);
-    std::reverse(path.begin(), path.end());
-
+    path.push_back(source); // Add the source at the end
+    std::reverse(path.begin(), path.end()); // Reverse the path to get it in the correct order
     return path;
+}
+
+// Function to compute and return all shortest paths
+std::vector<std::vector<std::vector<int>>> find_all_shortest_paths(const Graph& g) {
+    size_t num_vertices = boost::num_vertices(g);
+
+    // Nested vector to store all paths
+    // Outer vector: Source vertices
+    // Inner vector: Target vertices
+    // Innermost vector: Shortest path from source to target
+    std::vector<std::vector<std::vector<int>>> all_paths(num_vertices, std::vector<std::vector<int>>(num_vertices));
+
+    for (Vertex source = 0; source < num_vertices; ++source) {
+        std::vector<int> distances(num_vertices, INF);
+        std::vector<Vertex> predecessors(num_vertices, source);
+
+        // Run Dijkstra's algorithm from the current source vertex
+        boost::dijkstra_shortest_paths(g, source,
+            boost::distance_map(boost::make_iterator_property_map(distances.begin(), boost::get(boost::vertex_index, g))).
+            predecessor_map(boost::make_iterator_property_map(predecessors.begin(), boost::get(boost::vertex_index, g))).
+            weight_map(boost::get(&EdgeProperties::weight, g)));
+
+        // Reconstruct paths to all other vertices
+        for (Vertex target = 0; target < num_vertices; ++target) {
+            if (source == target) {
+                all_paths[source][target] = { static_cast<int>(source) }; // Path to itself
+            }
+            else if (distances[target] == INF) {
+                all_paths[source][target] = {}; // No path exists
+            }
+            else {
+                all_paths[source][target] = reconstruct_path(source, target, predecessors);
+            }
+        }
+    }
+
+    return all_paths;
 }

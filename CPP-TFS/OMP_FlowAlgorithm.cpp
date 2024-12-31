@@ -44,7 +44,7 @@ void parallel_normalize_flows(Graph& g, double bottleneck_value, vector<boost::g
 
 void parallel_updateCommoditiesSent(vector<Commodity>& commodities, double bottleneck_value) {
     int i;
-#pragma omp parallel for schedule(dynamic, 64)
+#pragma omp parallel for
     for (i = 0; i < commodities.size(); i++) {
         commodities[i].sent *= bottleneck_value;
     }
@@ -64,13 +64,13 @@ bool parallel_isFlowExceedingCapacity(Graph& g, vector<boost::graph_traits<Graph
     bool result = false;
     int i;
 
-#pragma omp parallel for
+    #pragma omp parallel for
     for (i = 0; i < edges_with_flow.size(); i++) {
         if (result) continue;
 
         auto e = edges_with_flow[i];
         if (g[e].flow > g[e].capacity) {
-#pragma omp critical
+            #pragma omp critical
             {
                 result = true;
             }
@@ -96,18 +96,24 @@ double OMP_flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, d
     int i;
 
     double prev_max_ratio = 0.0;
-    while (true) {
-        #pragma omp parallel for schedule(dynamic, 64)
-        for (i = 0; i < commodities.size(); i++) {
-            std::vector<int> path = find_shortest_path(g, commodities[i].source, commodities[i].destination);
-            if (path.empty()) continue;
+    std::vector<std::vector<std::vector<int>>> all_shortest_paths = find_all_shortest_paths(g);
 
-            for (int j = 1; j < path.size(); ++j) {
-                auto e = boost::edge(path[j - 1], path[j], g).first;
-                #pragma omp critical
-                {
-                    g[e].flow += commodities[i].demand;
-                }
+    while (true) {
+        #pragma omp parallel for
+        for (i = 0; i < commodities.size(); i++) {
+            // Retrieve the shortest path for this source-destination pair
+            const std::vector<int>& path = all_shortest_paths[commodities[i].source][commodities[i].destination];
+
+            if (path.empty()) {
+                std::cerr << "No path exists between source " << commodities[i].source
+                    << " and destination " << commodities[i].destination << std::endl;
+                continue;
+            }
+
+            // Use the path to distribute flows
+            for (size_t i = 1; i < path.size(); ++i) {
+                auto e = boost::edge(path[i - 1], path[i], g).first;
+                g[e].flow += commodities[i].demand;
                 commodities[i].sent = g[e].flow;
             }
         }

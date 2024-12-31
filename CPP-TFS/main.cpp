@@ -171,24 +171,24 @@ int main() {
                 << ", Demand = " << commodity.demand << endl;
         }
 
-        omp_set_num_threads(8);
+        /*omp_set_num_threads(8);
         double omp_start = omp_get_wtime();
         double omp_ratio = OMP_flowDistributionAlgorithm(g, commodities, 0.01, 0.12);
         double omp_end = omp_get_wtime();
 
-        reset_flow_and_commodity(g, commodities);
+        reset_flow_and_commodity(g, commodities);*/
 
         double ori_start = omp_get_wtime();
         double ori_ratio = flowDistributionAlgorithm(g, commodities, 0.01, 0.12);
         double ori_end = omp_get_wtime();
 
-        double omp_runtime = omp_end - omp_start;
+        //double omp_runtime = omp_end - omp_start;
         double ori_runtime = ori_end - ori_start;
 
-        cout << "Max ratio (OMP): " << omp_ratio << endl;
+        //cout << "Max ratio (OMP): " << omp_ratio << endl;
         cout << "Max ratio (Original): " << ori_ratio << endl;
         cout << "Original Runtime: " << ori_runtime << endl;
-        cout << "OMP Runtime: " << omp_runtime << endl;
+        //cout << "OMP Runtime: " << omp_runtime << endl;
 
         // write into file
         std::ofstream mainFile("..\\Python-TFS\\cuda_omp_st.txt");
@@ -202,9 +202,9 @@ int main() {
 
         // write some text to the file
         mainFile << "ST, " << ori_runtime << std::endl;
-        mainFile << "OMP, " << omp_runtime << std::endl;
+        //mainFile << "OMP, " << omp_runtime << std::endl;
 
-        ompFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << omp_runtime << ")" << endl;
+        //ompFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << omp_runtime << ")" << endl;
         stFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << ori_runtime << ")" << endl;
 
         // close the file
