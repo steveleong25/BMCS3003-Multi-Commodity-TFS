@@ -13,17 +13,13 @@ typedef graph_traits<Graph>::vertex_descriptor Vertex;
 typedef std::pair<int, int> Edge;
 
 // Function to reconstruct a single path using the predecessor map
-std::vector<int> reconstruct_path(Vertex source, Vertex target, const std::vector<Vertex>& predecessors) {
+std::vector<int> reconstruct_path(int source, int destination, const std::vector<Vertex>& predecessors) {
     std::vector<int> path;
-    Vertex current = target;
-
-    // Trace back the path using the predecessor map
-    while (current != source) {
-        path.push_back(current);
-        current = predecessors[current];
+    for (Vertex v = destination; v != source; v = predecessors[v]) {
+        path.push_back(v);
     }
-    path.push_back(source); // Add the source at the end
-    std::reverse(path.begin(), path.end()); // Reverse the path to get it in the correct order
+    path.push_back(source);
+    std::reverse(path.begin(), path.end()); // Reverse to get the path from source to destination
     return path;
 }
 

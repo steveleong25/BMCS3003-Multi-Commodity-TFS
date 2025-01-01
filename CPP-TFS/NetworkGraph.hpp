@@ -8,12 +8,12 @@
 using namespace boost;
 
 struct EdgeProperties {
-    int weight;
-    int capacity;
-    int flow;
+    double weight;
+    double capacity;
+    double flow;
 
     EdgeProperties() : weight(0), capacity(0), flow(0) {}
-	EdgeProperties(int w, int cap, int f = 0) : weight(w), capacity(cap), flow(f) {}
+	EdgeProperties(double cap, double f = 0) : weight(1/cap), capacity(cap), flow(f) {}
 };
 
 // define the graph type (using adjacency list)
