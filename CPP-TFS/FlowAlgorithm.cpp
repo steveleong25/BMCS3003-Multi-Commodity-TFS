@@ -35,8 +35,6 @@ vector<boost::graph_traits<Graph>::edge_descriptor> get_edges_with_flow(Graph& g
 
 void flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, int num_of_iter) {
     for (int i = 0; i < num_of_iter; i++) {
-        if (i == num_of_iter - 1)
-            cout << "Iteration " << i << endl;
         for (int j = 0; j < commodities.size(); j++) {
             // Retrieve all shortest paths for all source-destination pair
             std::vector<std::vector<std::vector<int>>> all_shortest_paths = find_all_shortest_paths(g);
