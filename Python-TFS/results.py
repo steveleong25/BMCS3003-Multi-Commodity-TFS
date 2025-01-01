@@ -108,7 +108,7 @@ def compare_performance_with_sets(file_path):
 
 def prepare_individual_data_3(data_cuda, data_omp, data_st):
     """
-    Combines and sorts data by (num_nodes, num_of_commodity) from three data lists:
+    Combines and sorts data by num_of_iter from three data lists:
       data_cuda, data_omp, data_st
     Each is a list of tuples [(num_nodes, num_of_commodity, num_of_iter, runtime), ...].
     Returns:
@@ -116,7 +116,7 @@ def prepare_individual_data_3(data_cuda, data_omp, data_st):
       y_cuda, y_omp, y_st: lists of runtimes in corresponding order
     """
     # Collect all (num_nodes, num_of_commodity, num_of_iter) pairs from all three data sets
-    combined_data = sorted(set((n, c, i) for n, c, i, _ in data_cuda + data_omp + data_st))
+    combined_data = sorted(set((n, c, i) for n, c, i, _ in data_cuda + data_omp + data_st), key=lambda x: x[2])
     
     # Create labels with both iteration and (nodes, commodities)
     x_labels = [f"({i}, {n}, {c})" for n, c, i in combined_data]
@@ -179,6 +179,6 @@ st_data   = read_individual_data(st_file)
 
 x_labels, y_cuda, y_omp, y_st = prepare_individual_data_3(cuda_data, omp_data, st_data)
 
-num_iterations = cuda_data[0][2]
+num_iterations = st_data[0][2]
 
 plot_all_comparison_3(x_labels, y_cuda, y_omp, y_st, num_iterations)

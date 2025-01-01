@@ -111,16 +111,25 @@ Graph graph_test_init() {
     return g;
 }
 
-void reset_flow_and_commodity(Graph& g, vector<Commodity> commodities) {
+Graph reset_flow(Graph& g) {
     for (auto e : boost::make_iterator_range(boost::edges(g))) {
         g[e].flow = 0;
+        g[e].weight = 1 / g[e].capacity;
     }
 
-    for (Commodity c : commodities) {
+    return g;
+}
+
+vector<Commodity> reset_commodities(vector<Commodity> commodities) {
+    for (auto& c : commodities) {
         c.demand = c.init_demand;
         c.sent = 0;
+        c.used_paths_with_flows.clear();
     }
+
+    return commodities;
 }
+
 
 int main() {
     try {
@@ -182,7 +191,8 @@ int main() {
         OMP_flowDistributionAlgorithm(g, commodities, num_of_iter);
         double omp_end = omp_get_wtime();
 
-        //reset_flow_and_commodity(g, commodities);
+        g = reset_flow(g);
+        commodities = reset_commodities(commodities);
 
         double ori_start = omp_get_wtime();
         flowDistributionAlgorithm(g, commodities, num_of_iter);
@@ -201,36 +211,13 @@ int main() {
             }
         }
 
-        // write into file
-        /*std::ofstream mainFile("..\\Python-TFS\\cuda_omp_st.txt");
-        std::ofstream ompFile("..\\Python-TFS\\omp.txt", std::ios::app);
-        std::ofstream stFile("..\\Python-TFS\\st.txt", std::ios::app);*/
-
-        //if (!mainFile && !ompFile && !stFile) {
-        //    std::cerr << "Error opening file!" << std::endl;
-        //    return -1;
-        //}
-
-        // write some text to the file
-		//mainFile << num_nodes << ", " << commodities.size() << ", " << num_of_iter << std::endl;
-        //mainFile << "ST, " << ori_runtime << std::endl;
-        //mainFile << "OMP(" << num_threads << "), " << omp_runtime << std::endl;
-
-        //ompFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << omp_runtime << ", " << num_of_iter << ")" << endl;
-        //stFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << ori_runtime << ", " << num_of_iter << ")" << endl;
-
-        // close the file
-        /*mainFile.close();
-        ompFile.close();
-        stFile.close();*/
-
 		displayCommodityPaths(g, commodities);
 
-        //double omp_runtime = omp_end - omp_start;
+        double omp_runtime = omp_end - omp_start;
         double ori_runtime = ori_end - ori_start;
 
         cout << "Original Runtime: " << ori_runtime << endl;
-        //cout << "OMP Runtime: " << omp_runtime << endl;
+        cout << "OMP Runtime: " << omp_runtime << endl;
 
         // print all commodities sent
         cout << "\n== Commodities after Flow Distribution ==" << endl;
@@ -241,6 +228,28 @@ int main() {
                 << ", Sent = " << commodity.sent << endl;
         }
 
+        // write into file
+        std::ofstream mainFile("..\\Python-TFS\\cuda_omp_st.txt", std::ios::app);
+        std::ofstream ompFile("..\\Python-TFS\\omp.txt", std::ios::app);
+        std::ofstream stFile("..\\Python-TFS\\st.txt", std::ios::app);
+
+        if (!mainFile && !ompFile && !stFile) {
+            std::cerr << "Error opening file!" << std::endl;
+            return -1;
+        }
+
+        // write some text to the file
+		mainFile << num_vertices(g) << ", " << commodities.size() << ", " << num_of_iter << std::endl;
+        mainFile << "ST, " << ori_runtime << std::endl;
+        mainFile << "OMP(" << num_threads << "), " << omp_runtime << std::endl;
+
+        ompFile << "(" << boost::num_vertices(g) << ", " << commodities.size() <<  ", " << num_of_iter << ", " << omp_runtime << ")" << endl;
+        stFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << num_of_iter << ", " << ori_runtime << ")" << endl;
+
+        // close the file
+        mainFile.close();
+        ompFile.close();
+        stFile.close();
     }
     catch (const std::invalid_argument& e) {
         std::cerr << "Error: " << e.what() << endl;
