@@ -291,7 +291,7 @@ double CUDA_flowDistributionAlgorithm(Graph& g, std::vector<Commodity>& commodit
 
     // Step 1: Find shortest path for each commodity and distribute initial flow
     for (auto& commodity : commodities) {
-        std::vector<int> path = find_shortest_path(g, commodity.source, commodity.destination);
+        std::vector<int> path = find_all_shortest_paths(g);
 
         for (size_t i = 1; i < path.size(); ++i) {
             auto e = boost::edge(path[i - 1], path[i], g).first;
