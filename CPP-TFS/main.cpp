@@ -212,11 +212,12 @@ int main() {
         //}
 
         // write some text to the file
+		//mainFile << num_nodes << ", " << commodities.size() << ", " << num_of_iter << std::endl;
         //mainFile << "ST, " << ori_runtime << std::endl;
-        //mainFile << "OMP, " << omp_runtime << std::endl;
+        //mainFile << "OMP(" << num_threads << "), " << omp_runtime << std::endl;
 
-        //ompFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << omp_runtime << ")" << endl;
-        //stFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << ori_runtime << ")" << endl;
+        //ompFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << omp_runtime << ", " << num_of_iter << ")" << endl;
+        //stFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << ori_runtime << ", " << num_of_iter << ")" << endl;
 
         // close the file
         /*mainFile.close();

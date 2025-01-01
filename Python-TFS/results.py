@@ -17,45 +17,17 @@ def read_data(file_path):
 def read_individual_data(file_path):
     """
     Reads lines of the format:
-    (NODES, COMMODITIES, RUNTIME)
-    Returns a list of tuples [(nodes, commodities, runtime), ...]
+    (NUM_NODES, NUM_OF_COMMODITY, NUM_OF_ITER, RUNTIME)
+    Returns a list of tuples [(num_nodes, num_of_commodity, num_of_iter, runtime), ...]
     """
     data = []
     with open(file_path, 'r') as file:
         for line in file:
             if line.strip():  # Skip empty lines
-                # e.g. "(10000, 6, 12.62)" -> strip('()\n') -> "10000, 6, 12.62"
-                nodes, commodities, runtime = line.strip('()\n').split(', ')
-                data.append((int(nodes), int(commodities), float(runtime)))
+                # e.g. "(100000, 6, 10000, 11.3828)" -> strip('()\n') -> "100000, 6, 10000, 11.3828"
+                num_nodes, num_of_commodity, num_of_iter, runtime = line.strip('()\n').split(', ')
+                data.append((int(num_nodes), int(num_of_commodity), int(num_of_iter), float(runtime)))
     return data
-
-def read_data_with_sets(file_path):
-    """
-    Parses a text file with multiple sets of runtime data.
-    Returns a list of dictionaries for each set.
-    """
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
-    
-    sets = []
-    current_set = {}
-    for line in lines:
-        line = line.strip()
-        if ',' in line:
-            parts = line.split(', ')
-            if len(parts) == 2 and parts[0].isdigit():  # New set (iterations, threads)
-                if current_set:  # Save the previous set
-                    sets.append(current_set)
-                current_set = {'iterations': int(parts[0]), 'threads': int(parts[1]), 'runtimes': {}}
-            else:  # Runtime data
-                method, runtime = parts
-                current_set['runtimes'][method] = float(runtime)
-    
-    # Add the last set
-    if current_set:
-        sets.append(current_set)
-    
-    return sets
 
 def compare_runtime(data):
     """
@@ -74,90 +46,121 @@ def compare_runtime(data):
     plt.show()
 
 def compare_performance_with_sets(file_path):
-    """
-    Plots a line graph comparing the performance gain (speedup) relative to ST,
-    with x-axis as iterations and separate lines for each platform.
-    """
-    # Parse the file into sets
-    sets = read_data_with_sets(file_path)
-    
-    # Prepare data for plotting
-    performance_data = {}
-    for data_set in sets:
-        iterations = data_set['iterations']
-        runtimes = data_set['runtimes']
-        st_runtime = runtimes['ST']
-        
-        # Calculate performance gains for each method
-        for method, runtime in runtimes.items():
-            if method not in performance_data:
-                performance_data[method] = {'iterations': [], 'gains': []}
-            performance_data[method]['iterations'].append(iterations)
-            performance_data[method]['gains'].append(st_runtime / runtime if method != 'ST' else 1.0)
-    
-    # Plot performance gain for each method
-    plt.figure(figsize=(8, 5))
-    for method, data in performance_data.items():
-        plt.plot(data['iterations'], data['gains'], marker='o', linestyle='-', label=method)
-    
-    # Customize the graph
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    data = []
+    metadata = None
+
+    for line in lines:
+        line = line.strip()
+        if ',' in line and not any(char.isalpha() for char in line):  # Metadata line: no letters, just numbers
+            # Parse metadata line
+            metadata = tuple(map(int, line.split(',')))  # (nodes, commodities, iterations)
+        elif line.startswith('ST') or line.startswith('OMP') or line.startswith('CUDA'):
+            # Parse performance data
+            method, runtime = line.split(',')
+            runtime = float(runtime)
+            
+            # Extract thread count for OMP if available
+            if 'OMP' in method:
+                method_name, threads = method.split('(')
+                threads = threads.strip(')')
+                method = f"{method_name.strip()} ({threads} threads)"
+            
+            # Append parsed data with metadata
+            data.append((metadata, method.strip(), runtime))
+
+    # Organize data for plotting
+    iterations = [d[0][2] for d in data if d[1] == 'ST']  # X-axis: Iterations
+    methods = sorted(set(d[1] for d in data))  # Y-axis: Methods
+    method_to_runtimes = {method: [] for method in methods}
+
+    for iteration in iterations:
+        for method in methods:
+            runtime = next((d[2] for d in data if d[0][2] == iteration and d[1] == method), None)
+            method_to_runtimes[method].append(runtime)
+
+    # Plot the data
+    plt.figure(figsize=(8, 6))
+    for method, runtimes in method_to_runtimes.items():
+        plt.plot(iterations, runtimes, marker='o', label=method)
+
+    # Customize the plot
+    plt.xticks(iterations)  # Show only iteration points on the X-axis
     plt.xlabel('Iterations')
-    plt.ylabel('Performance Gain (Compared to ST)')
-    plt.title('Performance Gain Comparison Across Platforms')
-    plt.legend(title='Platforms')
-    plt.grid(True, linestyle='--', alpha=0.7)
-    
-    # Annotate points
-    for method, data in performance_data.items():
-        for x, y in zip(data['iterations'], data['gains']):
-            plt.text(x, y + 0.05, f'{y:.2f}', ha='center', fontsize=8)
-    
+    plt.ylabel('Runtime (seconds)')
+    plt.title('Performance Comparison Across Methods')
+    plt.legend()
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+    # Annotate points with metadata
+    for i, iteration in enumerate(iterations):
+        for method, runtimes in method_to_runtimes.items():
+            runtime = runtimes[i]
+            if runtime is not None:  # Ensure runtime exists
+                label = f"{metadata[0]}N, {metadata[1]}C"  # Nodes and Commodities
+                plt.text(iteration, runtime + 0.1, label, ha='center', fontsize=8)
+
+
     plt.tight_layout()
     plt.show()
 
 def prepare_individual_data_3(data_cuda, data_omp, data_st):
     """
-    Combines and sorts data by (nodes, commodities) from three data lists:
+    Combines and sorts data by (num_nodes, num_of_commodity) from three data lists:
       data_cuda, data_omp, data_st
-    Each is a list of tuples [(nodes, commodities, runtime), ...].
+    Each is a list of tuples [(num_nodes, num_of_commodity, num_of_iter, runtime), ...].
     Returns:
-      x_labels: list of "(nodes, commodities)" strings
+      x_labels: list of "(iterations, num_nodes, num_of_commodity)" strings
       y_cuda, y_omp, y_st: lists of runtimes in corresponding order
     """
-    # Collect all (nodes, commodities) pairs from all three data sets
-    combined_data = sorted(set((n, c) for n, c, _ in data_cuda + data_omp + data_st))
+    # Collect all (num_nodes, num_of_commodity, num_of_iter) pairs from all three data sets
+    combined_data = sorted(set((n, c, i) for n, c, i, _ in data_cuda + data_omp + data_st))
     
-    x_labels = [f"({n}, {c})" for n, c in combined_data]
+    # Create labels with both iteration and (nodes, commodities)
+    x_labels = [f"({i}, {n}, {c})" for n, c, i in combined_data]
     
     # For each (n,c), find the runtime in each data set
-    y_cuda = [next((r for nn, cc, r in data_cuda if (nn, cc) == (n, c)), None) 
-              for n, c in combined_data]
-    y_omp  = [next((r for nn, cc, r in data_omp  if (nn, cc) == (n, c)), None) 
-              for n, c in combined_data]
-    y_st   = [next((r for nn, cc, r in data_st   if (nn, cc) == (n, c)), None) 
-              for n, c in combined_data]
+    y_cuda = [next((r for nn, cc, ii, r in data_cuda if (nn, cc, ii) == (n, c, i)), None) 
+              for n, c, i in combined_data]
+    y_omp  = [next((r for nn, cc, ii, r in data_omp  if (nn, cc, ii) == (n, c, i)), None) 
+              for n, c, i in combined_data]
+    y_st   = [next((r for nn, cc, ii, r in data_st   if (nn, cc, ii) == (n, c, i)), None) 
+              for n, c, i in combined_data]
     
     return x_labels, y_cuda, y_omp, y_st
 
-def plot_all_comparison_3(x_labels, y_cuda, y_omp, y_st):
+def plot_all_comparison_3(x_labels, y_cuda, y_omp, y_st, num_iterations):
     """
     Plots three lines (CUDA, OMP, ST) comparing runtimes across different 
-    (nodes, commodities) pairs.
+    (nodes, commodities) pairs, including the number of iterations in the title.
     """
-    plt.figure(figsize=(7, 4))
-    plt.plot(x_labels, y_cuda, marker='^', label='CUDA', color='green')
-    plt.plot(x_labels, y_omp,  marker='o', label='OMP',  color='blue')
-    plt.plot(x_labels, y_st,   marker='s', label='Single Thread', color='orange')
+    plt.figure(figsize=(8, 5))  # Slightly larger figure size for better visibility
+
+    # Plotting the data for each method
+    plt.plot(x_labels, y_cuda, marker='^', label='CUDA', color='green', linestyle='-', markersize=6)
+    plt.plot(x_labels, y_omp,  marker='o', label='OMP',  color='blue', linestyle='-', markersize=6)
+    plt.plot(x_labels, y_st,   marker='s', label='Single Thread', color='orange', linestyle='-', markersize=6)
     
-    plt.xlabel('(Nodes, Commodities)')
-    plt.ylabel('Runtime (s)')
-    plt.title('Comparison of Runtime by (Nodes, Commodities)')
-    plt.xticks(rotation=45, ha='right')
-    plt.legend()
-    plt.grid(True)
+    plt.xlabel('(Iterations, Nodes, Commodities)', fontsize=12)
+    plt.ylabel('Runtime (s)', fontsize=12)
+    
+    # Update the title to include the number of iterations
+    plt.title(f'Comparison of Runtime by (Iterations, Nodes, Commodities) with {num_iterations} Iterations', fontsize=14)
+    
+    # Rotate x-axis labels to avoid overlap and align them more clearly
+    plt.xticks(rotation=45, ha='right', fontsize=10)
+    
+    # Adjust the grid for better clarity
+    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+    
+    # Add legend for clarity
+    plt.legend(fontsize=10)
+    
+    # Tight layout to ensure no clipping of labels
     plt.tight_layout()
     plt.show()
-
 # --------------------------------------------------
 # File paths to the text files
 # --------------------------------------------------
@@ -175,4 +178,7 @@ omp_data  = read_individual_data(omp_file)
 st_data   = read_individual_data(st_file)
 
 x_labels, y_cuda, y_omp, y_st = prepare_individual_data_3(cuda_data, omp_data, st_data)
-plot_all_comparison_3(x_labels, y_cuda, y_omp, y_st)
+
+num_iterations = cuda_data[0][2]
+
+plot_all_comparison_3(x_labels, y_cuda, y_omp, y_st, num_iterations)
