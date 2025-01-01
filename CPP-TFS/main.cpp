@@ -30,8 +30,7 @@ Graph generate_random_graph(long long num_nodes, long long num_edges) {
     }
 
     Graph g(num_nodes);
-    boost::random::mt19937 gen;
-    boost::random::uniform_int_distribution<> dist_weight(1, 20);  
+    boost::random::mt19937 gen; 
     boost::random::uniform_int_distribution<> dist_capacity(10, 50); 
 
     long long edge_count = 0;
@@ -50,7 +49,7 @@ Graph generate_random_graph(long long num_nodes, long long num_edges) {
                 g[e].capacity = dist_capacity(gen);  // set the capacity for the edge
                 g[e].flow = 0;  // initialize the flow to 0
 
-                put(boost::edge_weight, g, e, dist_weight(gen));
+                put(boost::edge_weight, g, e, 1/g[e].capacity);
                 edge_count++;
             }
         }
@@ -178,8 +177,6 @@ int main() {
             
         }
 
-		/*int max_threads = omp_get_max_threads();
-		cout << "Max threads: " << max_threads << endl;*/
         omp_set_num_threads(num_threads);
         double omp_start = omp_get_wtime();
         OMP_flowDistributionAlgorithm(g, commodities, num_of_iter);
@@ -187,9 +184,9 @@ int main() {
 
         //reset_flow_and_commodity(g, commodities);
 
-        /*double ori_start = omp_get_wtime();
+        double ori_start = omp_get_wtime();
         flowDistributionAlgorithm(g, commodities, num_of_iter);
-        double ori_end = omp_get_wtime();*/
+        double ori_end = omp_get_wtime();
 
         for (auto e : boost::make_iterator_range(boost::edges(g))) {
             auto source_node = boost::source(e, g);
@@ -228,11 +225,11 @@ int main() {
 
 		displayCommodityPaths(g, commodities);
 
-        double omp_runtime = omp_end - omp_start;
-        //double ori_runtime = ori_end - ori_start;
+        //double omp_runtime = omp_end - omp_start;
+        double ori_runtime = ori_end - ori_start;
 
-        //cout << "Original Runtime: " << ori_runtime << endl;
-        cout << "OMP Runtime: " << omp_runtime << endl;
+        cout << "Original Runtime: " << ori_runtime << endl;
+        //cout << "OMP Runtime: " << omp_runtime << endl;
 
         // print all commodities sent
         cout << "\n== Commodities after Flow Distribution ==" << endl;
