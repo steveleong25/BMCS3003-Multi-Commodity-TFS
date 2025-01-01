@@ -29,14 +29,33 @@ def read_individual_data(file_path):
                 data.append((int(nodes), int(commodities), float(runtime)))
     return data
 
-def calculate_performance_gain(data):
+def read_data_with_sets(file_path):
     """
-    Calculates the performance gain compared to ST (Single-Thread) baseline.
-    If ST is 15s and OMP is 10s, gain = 15/10 = 1.5, meaning 1.5x faster.
-    Returns a dict { 'ST': 1.0, 'OMP': <gain>, 'CUDA': <gain>, ... }
+    Parses a text file with multiple sets of runtime data.
+    Returns a list of dictionaries for each set.
     """
-    baseline = data['ST']  # Use the ST value as the baseline
-    return {key: baseline / value for key, value in data.items()}
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+    
+    sets = []
+    current_set = {}
+    for line in lines:
+        line = line.strip()
+        if ',' in line:
+            parts = line.split(', ')
+            if len(parts) == 2 and parts[0].isdigit():  # New set (iterations, threads)
+                if current_set:  # Save the previous set
+                    sets.append(current_set)
+                current_set = {'iterations': int(parts[0]), 'threads': int(parts[1]), 'runtimes': {}}
+            else:  # Runtime data
+                method, runtime = parts
+                current_set['runtimes'][method] = float(runtime)
+    
+    # Add the last set
+    if current_set:
+        sets.append(current_set)
+    
+    return sets
 
 def compare_runtime(data):
     """
@@ -54,23 +73,45 @@ def compare_runtime(data):
     plt.tight_layout()
     plt.show()
 
-def compare_performance(performance_gain_data):
+def compare_performance_with_sets(file_path):
     """
-    Plots a bar chart comparing the performance gain (speedup) 
-    relative to ST across different methods.
+    Plots a line graph comparing the performance gain (speedup) relative to ST,
+    with x-axis as iterations and separate lines for each platform.
     """
-    x = list(performance_gain_data.keys())
-    y = list(performance_gain_data.values())
-
-    plt.figure(figsize=(6, 4))
-    plt.bar(x, y, color=['blue', 'orange', 'green'])
-    plt.xlabel('Methods')
+    # Parse the file into sets
+    sets = read_data_with_sets(file_path)
+    
+    # Prepare data for plotting
+    performance_data = {}
+    for data_set in sets:
+        iterations = data_set['iterations']
+        runtimes = data_set['runtimes']
+        st_runtime = runtimes['ST']
+        
+        # Calculate performance gains for each method
+        for method, runtime in runtimes.items():
+            if method not in performance_data:
+                performance_data[method] = {'iterations': [], 'gains': []}
+            performance_data[method]['iterations'].append(iterations)
+            performance_data[method]['gains'].append(st_runtime / runtime if method != 'ST' else 1.0)
+    
+    # Plot performance gain for each method
+    plt.figure(figsize=(8, 5))
+    for method, data in performance_data.items():
+        plt.plot(data['iterations'], data['gains'], marker='o', linestyle='-', label=method)
+    
+    # Customize the graph
+    plt.xlabel('Iterations')
     plt.ylabel('Performance Gain (Compared to ST)')
-    plt.title('Performance Gain Comparison')
-    plt.ylim(0, max(y) + 0.1)
-    # Annotate each bar with the performance gain value
-    for i, v in enumerate(y):
-        plt.text(i, v + 0.01, f'{v:.2f}', ha='center')
+    plt.title('Performance Gain Comparison Across Platforms')
+    plt.legend(title='Platforms')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    
+    # Annotate points
+    for method, data in performance_data.items():
+        for x, y in zip(data['iterations'], data['gains']):
+            plt.text(x, y + 0.05, f'{y:.2f}', ha='center', fontsize=8)
+    
     plt.tight_layout()
     plt.show()
 
@@ -125,24 +166,10 @@ cuda_file        = 'cuda.txt'         # Contains data for CUDA alone
 omp_file         = 'omp.txt'          # Contains data for OMP alone
 st_file          = 'st.txt'           # Contains data for ST alone
 
-# --------------------------------------------------
-# 1) Read the aggregate data for ST, OMP, CUDA
-# --------------------------------------------------
-data = read_data(cuda_omp_st_file)
-
-# Calculate performance gain (speedup) with ST as the baseline
-performance_gain = calculate_performance_gain(data)
-
-# Visualize the raw runtimes in a bar chart
-compare_runtime(data)
 
 # Visualize the performance gain (speedup) in a bar chart
-compare_performance(performance_gain)
+compare_performance_with_sets(cuda_omp_st_file)
 
-# --------------------------------------------------
-# 2) Read the individual (nodes, commodities, runtime) data from each file
-#    Then plot a comparison line chart
-# --------------------------------------------------
 cuda_data = read_individual_data(cuda_file)
 omp_data  = read_individual_data(omp_file)
 st_data   = read_individual_data(st_file)
