@@ -180,13 +180,18 @@ int main() {
 
         omp_set_num_threads(num_threads);
         double omp_start = omp_get_wtime();
-        CUDA_flowDistributionAlgorithm(g, commodities, num_of_iter);
+        OMP_flowDistributionAlgorithm(g, commodities, num_of_iter);
         double omp_end = omp_get_wtime();
+
+        double cuda_start = omp_get_wtime();
+        CUDA_flowDistributionAlgorithm(g, commodities, num_of_iter);
+        double cuda_end = omp_get_wtime();
+
 
         //reset_flow_and_commodity(g, commodities);
 
         double ori_start = omp_get_wtime();
-        //flowDistributionAlgorithm(g, commodities, num_of_iter);
+        flowDistributionAlgorithm(g, commodities, num_of_iter);
         double ori_end = omp_get_wtime();
 
         for (auto e : boost::make_iterator_range(boost::edges(g))) {
@@ -227,10 +232,12 @@ int main() {
         displayCommodityPaths(g, commodities);
 
         double omp_runtime = omp_end - omp_start;
+        double cuda_runtime = cuda_end - cuda_start;
         double ori_runtime = ori_end - ori_start;
 
         cout << "Original Runtime: " << ori_runtime << endl;
-        cout << "CUDA Runtime: " << omp_runtime << endl;
+        cout << "OpenMP Runtime: " << omp_runtime << endl;
+        cout << "CUDA Runtime: " << cuda_runtime << endl;
 
         // print all commodities sent
         cout << "\n== Commodities after Flow Distribution ==" << endl;
