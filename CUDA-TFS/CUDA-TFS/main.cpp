@@ -1,54 +1,56 @@
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
+#include "CUDA_FlowAlgorithm.cuh"
 #include "OMP_FlowAlgorithm.hpp"
-#include "PropFlowAlgorithm.hpp"
+#include "FlowAlgorithm.hpp"
 #include "Commodity.hpp"
-#include "Cuda_PropFlowAlgorithm.cuh"
 #include <iostream>
-#include <fstream>          
+#include <fstream>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/random.hpp>
 #include <boost/random.hpp>
 #include <omp.h>
 
 using namespace std;
+
 using namespace boost;
 
+// Define the graph type
 Graph generate_random_graph(long long num_nodes, long long num_edges) {
     if (num_nodes <= 1) {
         throw std::invalid_argument("Number of nodes must be greater than 1.");
     }
 
-    long long max_edges = num_nodes * (num_nodes - 1); // directed graph
+    long long max_edges = num_nodes * (num_nodes - 1);
     if (num_edges > max_edges) {
         std::cerr << "Requested number of edges (" << num_edges
             << ") exceeds the maximum possible edges (" << max_edges
             << ") for " << num_nodes << " nodes.\n";
-        num_edges = max_edges; // adjust num_edges to the maximum
+        num_edges = max_edges;
         std::cout << "Reducing number of edges to " << num_edges << ".\n";
     }
 
     Graph g(num_nodes);
     boost::random::mt19937 gen;
-    boost::random::uniform_int_distribution<> dist_weight(1, 20);
     boost::random::uniform_int_distribution<> dist_capacity(10, 50);
 
     long long edge_count = 0;
 
     cout << "Initializing edges..." << endl;
-    // Generate random edges
+    // generate random edges
     while (edge_count < num_edges) {
-        int u = gen() % num_nodes; // source
-        int v = gen() % num_nodes; // destination
+        int u = gen() % num_nodes; //source
+        int v = gen() % num_nodes; //destination
 
         if (u != v) {
             auto [edge, exists] = boost::edge(u, v, g);
             if (!exists) {
-                // Add the edge if it doesn't exist
+                // idd the edge if it doesn't exist
                 auto e = boost::add_edge(u, v, g).first;
-                g[e].capacity = dist_capacity(gen);  // Set the capacity
-                g[e].flow = 0;                       // Initialize flow
-                put(boost::edge_weight, g, e, dist_weight(gen));
+                g[e].capacity = dist_capacity(gen);  // set the capacity for the edge
+                g[e].flow = 0;  // initialize the flow to 0
+
+                put(boost::edge_weight, g, e, 1 / g[e].capacity);
                 edge_count++;
             }
         }
@@ -61,19 +63,41 @@ Graph generate_random_graph(long long num_nodes, long long num_edges) {
 
 Graph graph_test_init() {
     std::vector<std::pair<int, int>> edges = {
-        {0, 1}, {1, 0}, // 0 and 1
-        {1, 2}, {2, 1}, // 1 and 2
-        {2, 3}, {3, 2}, // 2 and 3
-        {2, 5}, {5, 2}, // 2 and 5
-        {4, 1}, {1, 4}  // 4 and 1
+        {1, 2}, {2, 1},
+        {2, 3}, {3, 2},
+        {3, 4}, {4, 3},
+        {3, 6}, {6, 3},
+        {2, 5}, {5, 2},
+        {5, 1}, {1, 5},
+        {4, 6}, {6, 4},
+        {1, 7}, {7, 1},
+        {7, 8}, {8, 7},
+        {8, 9}, {9, 8},
+        {9, 10}, {10, 9},
+        {10, 4}, {4, 10},
+        {5, 11}, {11, 5},
+        {11, 12}, {12, 11},
+        {12, 13}, {13, 12},
+        {13, 6}, {6, 13},
     };
 
     std::vector<EdgeProperties> edge_properties = {
-        {10, 10}, {10, 10}, //  0 <-> 1
-        {12, 20}, {12, 20}, //  1 <-> 2
-        {8, 15}, {8, 15},   //  2 <-> 3
-        {10, 40}, {10, 40}, //  2 <-> 5
-        {15, 30}, {15, 30}  //  4 <-> 1
+        {20}, {20},
+        {10}, {10},
+        {20}, {20},
+        {20}, {20},
+        {30}, {30},
+        {600}, {600},
+        {400}, {400},
+        {100}, {100},
+        {100}, {100},
+        {100}, {100},
+        {200}, {200},
+        {600}, {600},
+        {600}, {600},
+        {600}, {600},
+        {400}, {400},
+        {400}, {400},
     };
 
     Graph g;
@@ -82,41 +106,56 @@ Graph graph_test_init() {
         auto e = boost::add_edge(edges[i].first, edges[i].second, g).first;
         g[e].capacity = edge_properties[i].capacity;
         g[e].flow = edge_properties[i].flow;
-        put(boost::edge_weight, g, e, edge_properties[i].weight);
+        g[e].weight = 100 / g[e].capacity;
     }
 
     return g;
 }
 
-int main()
-{
+void reset_flow_and_commodity(Graph& g, vector<Commodity> commodities) {
+    for (auto e : boost::make_iterator_range(boost::edges(g))) {
+        g[e].flow = 0;
+    }
+
+    for (Commodity c : commodities) {
+        c.demand = c.init_demand;
+        c.sent = 0;
+    }
+}
+
+int main() {
     try {
-        long long num_nodes;    // adjust nodes
-        long long num_edges;  // desired number of edges
+        // Graph
+        long long num_nodes, num_edges;
 
-        Graph g = generate_random_graph(num_nodes, num_edges);
-        Graph g2 = g; // For OMP
-        Graph g3 = g; // For CUDA
+        // Commodity
+        int num_commodities, min_demand, max_demand;
 
-        int num_commodities;  // number of commodities
-        int min_demand;      // minimum demand for a commodity
-        int max_demand;     // maximum demand for a commodity
+        int num_threads, num_of_iter;
 
-        cout << "Enter the number of nodes: ";
-	    cin >> num_nodes;
-	    cout << "Enter the number of edges: ";
-	    cin >> num_edges;
-	    cout << "Enter the number of commodities: ";
-	    cin >> num_commodities;
-	    cout << "Enter the minimum demand for each commodities: ";
-	    cin >> min_demand;
-    	cout << "Enter the maximum demand for each commodities: ";
-	    cin >> max_demand;
+        /*cout << "Enter the number of nodes: ";
+        cin >> num_nodes;
+        cout << "Enter the number of edges: ";
+        cin >> num_edges;
+        cout << "Enter the number of commodities: ";
+        cin >> num_commodities;
+        cout << "Enter the minimum demand for each commodities: ";
+        cin >> min_demand;
+        cout << "Enter the maximum demand for each commodities: ";
+        cin >> max_demand;*/
+        cout << "Enter the number of iterations: ";
+        cin >> num_of_iter;
+        cout << "Enter the number of threads to use: ";
+        cin >> num_threads;
 
-        std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
+        Graph g = graph_test_init();
+        //Graph g = generate_random_graph(num_nodes, num_edges);
 
-
-
+        //std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
+        std::vector<Commodity> commodities = {
+            {1, 4, 200},
+            {5, 6, 400},
+        };
 
         cout << "\n== Initial Commodities before Flow Distribution ==" << endl;
         for (const auto& commodity : commodities) {
@@ -124,98 +163,83 @@ int main()
                 << ", Destination = " << commodity.destination
                 << ", Demand = " << commodity.demand << endl;
         }
-        cout << "=========================================" << endl;
 
-        // 4) SINGLE-THREADED / ORIGINAL
+        for (auto e : boost::make_iterator_range(boost::edges(g))) {
+            auto source_node = boost::source(e, g);
+            auto target_node = boost::target(e, g);
+
+            auto flow = g[e].flow;
+            auto capacity = g[e].capacity;
+
+
+            std::cout << source_node << " -> " << target_node
+                << " [Flow: " << flow << ", Capacity: " << capacity
+                << ", Weight: " << g[e].weight << "]\n";
+
+        }
+
+        omp_set_num_threads(num_threads);
+        double omp_start = omp_get_wtime();
+        CUDA_flowDistributionAlgorithm(g, commodities, num_of_iter);
+        double omp_end = omp_get_wtime();
+
+        //reset_flow_and_commodity(g, commodities);
+
         double ori_start = omp_get_wtime();
-        double ori_ratio = flowDistributionAlgorithm(g, commodities, 0.01, 0.12);
+        //flowDistributionAlgorithm(g, commodities, num_of_iter);
         double ori_end = omp_get_wtime();
+
+        for (auto e : boost::make_iterator_range(boost::edges(g))) {
+            auto source_node = boost::source(e, g);
+            auto target_node = boost::target(e, g);
+
+            auto flow = g[e].flow;
+            auto capacity = g[e].capacity;
+
+            if (g[e].flow > 0) {
+                std::cout << source_node << " -> " << target_node
+                    << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
+            }
+        }
+
+        // write into file
+        /*std::ofstream mainFile("..\\Python-TFS\\cuda_omp_st.txt");
+        std::ofstream ompFile("..\\Python-TFS\\omp.txt", std::ios::app);
+        std::ofstream stFile("..\\Python-TFS\\st.txt", std::ios::app);*/
+
+        //if (!mainFile && !ompFile && !stFile) {
+        //    std::cerr << "Error opening file!" << std::endl;
+        //    return -1;
+        //}
+
+        // write some text to the file
+        //mainFile << "ST, " << ori_runtime << std::endl;
+        //mainFile << "OMP, " << omp_runtime << std::endl;
+
+        //ompFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << omp_runtime << ")" << endl;
+        //stFile << "(" << boost::num_vertices(g) << ", " << commodities.size() << ", " << ori_runtime << ")" << endl;
+
+        // close the file
+        /*mainFile.close();
+        ompFile.close();
+        stFile.close();*/
+
+        displayCommodityPaths(g, commodities);
+
+        double omp_runtime = omp_end - omp_start;
         double ori_runtime = ori_end - ori_start;
 
-        cout << "=========================================" << endl;
+        cout << "Original Runtime: " << ori_runtime << endl;
+        cout << "CUDA Runtime: " << omp_runtime << endl;
 
-        // 5) OPENMP
-        omp_set_num_threads(10);
-        double omp_start = omp_get_wtime();
-        double omp_ratio = OMP_flowDistributionAlgorithm(g2, commodities, 0.01, 0.12);
-        double omp_end = omp_get_wtime();
-        double omp_runtime = omp_end - omp_start;
-
-        cout << "=========================================" << endl;
-
-
-        double cuda_start = omp_get_wtime();
-        double cuda_ratio = CUDA_flowDistributionAlgorithm(g3, commodities, 0.01, 0.12);
-        double cuda_end = omp_get_wtime();
-        double cuda_runtime = cuda_end - cuda_start;
-
-        cout << "=========================================" << endl;
-
-
+        // print all commodities sent
         cout << "\n== Commodities after Flow Distribution ==" << endl;
         for (const auto& commodity : commodities) {
             cout << "Commodity: Source = " << commodity.source
                 << ", Destination = " << commodity.destination
-                << ", Demand = " << commodity.demand
+                << ", Demand = " << commodity.init_demand
                 << ", Sent = " << commodity.sent << endl;
         }
-
-
-        cout << "Max ratio (Original): " << ori_ratio << endl;
-        cout << "Max ratio (OMP):      " << omp_ratio << endl;
-        cout << "Max ratio (CUDA):    " << cuda_ratio << endl;
-        cout << "Original Runtime:    " << ori_runtime << endl;
-        cout << "OMP Runtime:         " << omp_runtime << endl;
-        cout << "CUDA Runtime:        " << cuda_runtime << endl;
-
-
-
-        std::ofstream mainFile("..\\..\\Python-TFS\\cuda_omp_st.txt");
-        std::ofstream stFile("..\\..\\Python-TFS\\st.txt", std::ios::app);
-        std::ofstream ompFile("..\\..\\Python-TFS\\omp.txt", std::ios::app);
-        std::ofstream cudaFile("..\\..\\Python-TFS\\cuda.txt", std::ios::app);
-
-        if (!mainFile) {
-            cerr << "Error opening mainFile: " << endl;
-            return -1;
-        }
-        if (!stFile) {
-            cerr << "Error opening stFile: " << endl;
-            return -1;
-        }
-        if (!ompFile) {
-            cerr << "Error opening ompFile: " << endl;
-            return -1;
-        }
-        if (!cudaFile) {
-            cerr << "Error opening cudaFile: " << endl;
-            return -1;
-        }
-
-        mainFile << "ST, " << ori_runtime << std::endl;
-        mainFile << "OMP, " << omp_runtime << std::endl;
-        mainFile << "CUDA, " << cuda_runtime << std::endl;
-
-        stFile << "(" << boost::num_vertices(g) << ", "
-       << commodities.size() << ", "
-            << ori_runtime << ")"
-            << endl;
-
-        ompFile << "(" << boost::num_vertices(g) << ", "
-            << commodities.size() << ", "
-            << omp_runtime << ")"
-            << endl;
-
-        cudaFile << "(" << boost::num_vertices(g) << ", "
-            << commodities.size() << ", "
-            << cuda_runtime << ")"
-            << endl;
-
-        // Close all file streams
-        mainFile.close();
-        stFile.close();
-        ompFile.close();
-        cudaFile.close();
 
     }
     catch (const std::invalid_argument& e) {

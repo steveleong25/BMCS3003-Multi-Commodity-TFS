@@ -1,3 +1,9 @@
+<<<<<<< Updated upstream
 ST, 18.1534
 OMP, 15.707
 CUDA, 16.089
+=======
+ST, 11.3828
+OMP, 9.4282
+CUDA, 9.8953
+>>>>>>> Stashed changes
