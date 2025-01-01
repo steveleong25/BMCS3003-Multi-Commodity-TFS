@@ -1,7 +1,7 @@
 #include "NetworkGraph.hpp"
 #include "PathFinder.hpp"
 #include "OMP_FlowAlgorithm.hpp"
-#include "PropFlowAlgorithm.hpp"
+#include "FlowAlgorithm.hpp"
 #include "Commodity.hpp"
 #include <iostream>
 #include <fstream>
@@ -20,12 +20,12 @@ Graph generate_random_graph(long long num_nodes, long long num_edges) {
         throw std::invalid_argument("Number of nodes must be greater than 1.");
     }
 
-    long long max_edges = num_nodes * (num_nodes - 1); // directed graph
+    long long max_edges = num_nodes * (num_nodes - 1);
     if (num_edges > max_edges) {
         std::cerr << "Requested number of edges (" << num_edges
             << ") exceeds the maximum possible edges (" << max_edges
             << ") for " << num_nodes << " nodes.\n";
-        num_edges = max_edges; // adjust num_edges to the maximum
+        num_edges = max_edges;
         std::cout << "Reducing number of edges to " << num_edges << ".\n";
     }
 
@@ -133,7 +133,7 @@ int main() {
 
         int num_threads, num_of_iter;
 
-        cout << "Enter the number of nodes: ";
+        /*cout << "Enter the number of nodes: ";
         cin >> num_nodes;
         cout << "Enter the number of edges: ";
         cin >> num_edges;
@@ -142,20 +142,20 @@ int main() {
         cout << "Enter the minimum demand for each commodities: ";
         cin >> min_demand;
         cout << "Enter the maximum demand for each commodities: ";
-        cin >> max_demand;
+        cin >> max_demand;*/
         cout << "Enter the number of iterations: ";
         cin >> num_of_iter;
         cout << "Enter the number of threads to use: ";
         cin >> num_threads;
 
-        //Graph g = graph_test_init();    
-        Graph g = generate_random_graph(num_nodes, num_edges);
+        Graph g = graph_test_init();    
+        //Graph g = generate_random_graph(num_nodes, num_edges);
 
-        std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
-	    /*std::vector<Commodity> commodities = {
+        //std::vector<Commodity> commodities = generate_random_commodities(num_commodities, g, min_demand, max_demand);
+	    std::vector<Commodity> commodities = {
 		    {1, 4, 200},
 		    {5, 6, 400},
-	    };*/
+	    };
 
         cout << "\n== Initial Commodities before Flow Distribution ==" << endl;
         for (const auto& commodity : commodities) {
@@ -178,24 +178,18 @@ int main() {
             
         }
 
-        /*omp_set_num_threads(8);
+		/*int max_threads = omp_get_max_threads();
+		cout << "Max threads: " << max_threads << endl;*/
+        omp_set_num_threads(num_threads);
         double omp_start = omp_get_wtime();
-        double omp_ratio = OMP_flowDistributionAlgorithm(g, commodities, 0.01, 0.12);
+        OMP_flowDistributionAlgorithm(g, commodities, num_of_iter);
         double omp_end = omp_get_wtime();
 
-        reset_flow_and_commodity(g, commodities);*/
+        //reset_flow_and_commodity(g, commodities);
 
-        double ori_start = omp_get_wtime();
+        /*double ori_start = omp_get_wtime();
         flowDistributionAlgorithm(g, commodities, num_of_iter);
-        double ori_end = omp_get_wtime();
-
-        //double omp_runtime = omp_end - omp_start;
-        double ori_runtime = ori_end - ori_start;
-
-        //cout << "Max ratio (OMP): " << omp_ratio << endl;
-        //cout << "Max ratio (Original): " << ori_ratio << endl;
-        cout << "Original Runtime: " << ori_runtime << endl;
-        //cout << "OMP Runtime: " << omp_runtime << endl;
+        double ori_end = omp_get_wtime();*/
 
         for (auto e : boost::make_iterator_range(boost::edges(g))) {
             auto source_node = boost::source(e, g);
@@ -233,6 +227,12 @@ int main() {
         stFile.close();*/
 
 		displayCommodityPaths(g, commodities);
+
+        double omp_runtime = omp_end - omp_start;
+        //double ori_runtime = ori_end - ori_start;
+
+        //cout << "Original Runtime: " << ori_runtime << endl;
+        cout << "OMP Runtime: " << omp_runtime << endl;
 
         // print all commodities sent
         cout << "\n== Commodities after Flow Distribution ==" << endl;

@@ -33,7 +33,7 @@ vector<boost::graph_traits<Graph>::edge_descriptor> get_edges_with_flow(Graph& g
     return edges_with_flow;
 }
 
-void flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, double num_of_iter) {
+void flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, int num_of_iter) {
     for (int i = 0; i < num_of_iter; i++) {
         if (i == num_of_iter - 1)
             cout << "Iteration " << i << endl;
@@ -111,20 +111,6 @@ void flowDistributionAlgorithm(Graph& g, vector<Commodity>& commodities, double 
             if (!path_exists) {
                 commodities[j].used_paths_with_flows.emplace_back(path, total_flow_assigned); // Add a new path and flow
             }
-
-            /*for (auto e : boost::make_iterator_range(boost::edges(g))) {
-                auto source_node = boost::source(e, g);
-                auto target_node = boost::target(e, g);
-
-                auto flow = g[e].flow;
-                auto capacity = g[e].capacity;
-
-                if (g[e].flow != 0) {
-                    std::cout << source_node << " -> " << target_node
-                        << " [Flow: " << flow << ", Capacity: " << capacity << "]\n";
-                }
-            }
-            cout << "=======================================================\n";*/
 
             commodities[j].sent += total_flow_assigned; // Update the total sent flow for the commodity
         }

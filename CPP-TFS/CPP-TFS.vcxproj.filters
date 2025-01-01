@@ -21,7 +21,7 @@
     <ClCompile Include="PathFinder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PropFlowAlgorithm.cpp">
+    <ClCompile Include="FlowAlgorithm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Commodity.cpp">
@@ -38,7 +38,7 @@
     <ClInclude Include="PathFinder.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="PropFlowAlgorithm.hpp">
+    <ClInclude Include="FlowAlgorithm.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="OMP_FlowAlgorithm.hpp">

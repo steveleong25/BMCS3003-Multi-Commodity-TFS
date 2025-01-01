@@ -135,14 +135,14 @@
     <ClCompile Include="OMP_FlowAlgorithm.cpp" />
     <ClCompile Include="PathFinder.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="PropFlowAlgorithm.cpp" />
+    <ClCompile Include="FlowAlgorithm.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Commodity.hpp" />
     <ClInclude Include="OMP_FlowAlgorithm.hpp" />
     <ClInclude Include="PathFinder.hpp" />
     <ClInclude Include="NetworkGraph.hpp" />
-    <ClInclude Include="PropFlowAlgorithm.hpp" />
+    <ClInclude Include="FlowAlgorithm.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
